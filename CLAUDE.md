@@ -83,7 +83,9 @@ Keep docs in lockstep with the code, **in the same change** — never wait to be
 
 - **(a) Fully automated** — unit/integration tests plus all debugging. Run in GitHub Actions
   CI on every push/PR. Claude **must read and analyze the CI run logs** (`gh run view --log`)
-  for every run — **even when the job is green**.
+  for every run — **even when the job is green**. When a run fails, **quote the actual failing
+  log fragment back to the user** (the real error lines, not just a paraphrase) so a human can
+  follow the diagnosis — then explain the cause and fix.
 - **(b) Dev-machine / AI-sandbox** — tests runnable only on a developer machine or against
   external services, or not fully automatable, run in an **isolated sandbox under Claude's
   control**. Claude runs these itself during development, and again after a release once full
@@ -115,20 +117,41 @@ Keep docs in lockstep with the code, **in the same change** — never wait to be
 - After a release (full CI green) Claude re-runs group-(b); any remaining group-(c) tests →
   methodology handed to the user.
 
-## Versioning (auto-generated — never hardcode)
+## Versioning & releasing (auto-generated — never hardcode, no tags)
 
-The version is produced by **GitVersion** (`GitVersion.yml`) — the single source of truth for
-the image tag, Helm chart, package, and any version written into docs. Branch model:
-`feature/*` (`-alpha`) → `dev` (`-dev`) → `rc` (`-rc`) → `release`. **There is no `main` branch.**
+**One source of truth: GitVersion** (`GitVersion.yml`). It computes the SemVer for *everything*
+— the container image, the Helm chart, and the published package/extension — from the branch
+graph. Branch model: `feature/*` (`-alpha`) → `dev` (`-dev`) → `rc` (`-rc`) → `release` (clean
+`X.Y.Z`). **There is no `main` branch, and there are no git tags.**
 
-- CI derives artifact versions from GitVersion automatically — GitLab via the shared
-  auto-semversioning template, GitHub via a `version` job that runs GitVersion. Both CIs and
-  the docs therefore agree on one number.
-- **Never hand-write a version.** When you must state a version in docs, release notes, or
-  examples, compute it via Docker (no local install needed) — `make version`, i.e.
-  `docker run --rm -v "$PWD:/repo" gittools/gitversion:6.3.0 /repo /showvariable SemVer` — or
-  read the CI's GitVersion output. Prefer wording like "the current release" over a number
-  that will go stale.
+- **The one knob is `next-version` in `GitVersion.yml`.** It sets the target release number. To
+  cut a new minor/major, bump `next-version`; patches increment automatically on `release`.
+- **Never hand-write a version** — not in `pyproject.toml`, not in `package.json`, not in docs.
+  The package files declare the version *dynamic*; `release.yml` injects the GitVersion number at
+  publish time. When you must state the version in docs, read it from CI's GitVersion output or
+  `docker run --rm -v "$PWD:/repo" gittools/gitversion:6.3.0 /repo /showvariable SemVer`.
+
+**Releasing is a merge, not a tag.** `release.yml` runs `on: push: branches: [rc, release]` —
+a merge into either branch IS a release:
+
+- merge to **`rc`** → a **pre-release** publish (PyPI `X.Y.ZrcN`; a VS Code extension uses
+  `vsce publish --pre-release`). GitVersion gives the `rc` label + number.
+- merge to **`release`** → the **stable** publish (clean `X.Y.Z`, from GitVersion's
+  `MajorMinorPatch`).
+
+To cut a new number, bump `next-version`; then merge `dev` → `rc` → `release` (approval-gated).
+`ci.yml` never publishes the package/extension. **Uses the latest GitVersion 6.x** — the config
+must be 6.x-native (a 5.x-style config makes `next-version` fail to parse).
+
+- **Python** (this template): `pyproject.toml` is `dynamic = ["version"]` reading
+  `<pkg>/__init__.py`; `release.yml` does `hatch version <gitversion>` then builds and publishes
+  to **PyPI via Trusted Publishing** (OIDC, no stored token). One-time PyPI setup: add a Trusted
+  Publisher for the project bound to this repo, workflow `release.yml`, environment `pypi`.
+- **VS Code extension / Node variant** (e.g. the sibling `gitlab-ci-monitor`): `release.yml` sets
+  `package.json` from GitVersion (`npm version <gitversion> --no-git-tag-version`), builds the
+  `.vsix`, and publishes to the **VS Code Marketplace** (`vsce`, secret `VSCE_PAT`) and optionally
+  **OpenVSX** (`ovsx`, secret `OVSX_PAT`). Same trigger (merge to `rc`/`release`) and GitVersion
+  source; a merge to `rc` publishes with `vsce publish --pre-release`.
 
 ## Build, artifacts & CI (apply without being asked)
 

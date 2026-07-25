@@ -5,7 +5,9 @@ build-backend = "hatchling.build"
 [project]
 # Template: rename "app" everywhere to your package/dist name.
 name = "app"
-version = "0.1.0"
+# Version is NOT hardcoded here. `release.yml` injects it from GitVersion at publish
+# time (`hatch version <semver>`), so the single source is GitVersion (see GitVersion.yml).
+dynamic = ["version"]
 description = "Sample service for the ai-project-template (replace me)."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -27,6 +29,11 @@ dev = [
 [project.scripts]
 app = "app.cli:main"
 app-serve = "app.server:run"
+
+# Dynamic version source: hatch reads `__version__` from this file, and `release.yml`
+# writes the GitVersion number into it at publish time (`hatch version <semver>`).
+[tool.hatch.version]
+path = "src/app/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/app"]
