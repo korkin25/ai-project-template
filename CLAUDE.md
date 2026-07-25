@@ -138,11 +138,17 @@ a merge into either branch IS a release:
 - merge to **`rc`** → a **pre-release** publish (PyPI `X.Y.ZrcN`; a VS Code extension uses
   `vsce publish --pre-release`). GitVersion gives the `rc` label + number.
 - merge to **`release`** → the **stable** publish (clean `X.Y.Z`, from GitVersion's
-  `MajorMinorPatch`).
+  `MajorMinorPatch`), **and** a **GitHub Release**: `release.yml` tags `vX.Y.Z` at that commit and
+  cuts a GitHub Release (auto-generated notes + the built artifacts — sdist/wheel, or the `.vsix`
+  for an extension). Pre-releases (`rc`) publish to the registry only — **no tag**, so pre-release
+  tags never confuse GitVersion.
 
 To cut a new number, bump `next-version`; then merge `dev` → `rc` → `release` (approval-gated).
-`ci.yml` never publishes the package/extension. **Uses the latest GitVersion 6.x** — the config
-must be 6.x-native (a 5.x-style config makes `next-version` fail to parse).
+`ci.yml` never publishes the package/extension. The auto-created `vX.Y.Z` tags are release records
+only — GitVersion still takes the version from `next-version` (kept above the last tag, which is
+exactly what bumping it to cut a release does). **Uses the latest GitVersion 6.x** — the config
+must be 6.x-native (a 5.x-style config makes `next-version` fail to parse); do **not** add a
+`tag-prefix` (it re-triggers that parse bug alongside `next-version`).
 
 - **Python** (this template): `pyproject.toml` is `dynamic = ["version"]` reading
   `<pkg>/__init__.py`; `release.yml` does `hatch version <gitversion>` then builds and publishes
