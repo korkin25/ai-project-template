@@ -135,6 +135,12 @@ the image tag, Helm chart, package, and any version written into docs. Branch mo
 CI (GitHub Actions) is the single release pipeline. Every push/PR runs the full gate set; a
 version tag `v*` publishes the release artifacts.
 
+**Composition, not inline jobs.** `.github/workflows/ci.yml` is wiring only — every job
+`uses:` a reusable workflow from the public [`korkin25/open-ci-actions@v1`](https://github.com/korkin25/open-ci-actions)
+(`detect` → `python` / `sast` / `docker` / `helm` / `functional` / `release`). GitLab mirrors
+the same via `open_ci_cd/templates`. **New shared CI logic belongs in `open-ci-actions`, not
+in this repo.** The gates below describe what those reusable workflows run.
+
 **Gates (every push/PR):**
 
 - Tests & types: ruff, mypy, pytest (3.11 & 3.12).
