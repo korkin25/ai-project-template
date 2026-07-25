@@ -53,6 +53,7 @@ chart (GHCR OCI). See `docs/` for architecture and configuration.
 - Everything the user asks to build, and every "add for brainstorm" idea, is a **numbered**
   entry in `Features.md` at the repository **root** (never under `docs/`). If a features doc
   lives under `docs/`, move it to the root.
+- `Features.md` lists **only user-facing product features** — what the software does for its users. **Never** put engineering/infra tasks there (deployment, CI/CD, release, versioning, tooling, refactors, governance) — those are tracked in `TODO.md`/`CHANGELOG.md`, not the feature backlog. If such an entry exists, remove it (its history stays in CHANGELOG/TODO).
 - Numbers are **stable and never reused**. Entries are grouped by state: **Current** (in
   progress) · **Planned** · **Brainstorm** (ideas) · **Delivered**.
 - A new idea from the user lands here first before it becomes a task in `TODO.md`.
