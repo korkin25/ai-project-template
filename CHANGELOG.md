@@ -9,13 +9,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- **Release standard: no tags — a merge to `release` publishes.** `release.yml` now runs
-  `on: push: branches: [release]`, computes the version with **GitVersion** (single knob
-  `next-version` in `GitVersion.yml`, `release` branch label `''` → clean `X.Y.Z`), injects it
-  into the build (`hatch version <semver>`), and publishes to PyPI via Trusted Publishing. The
-  reusable release job was removed from `ci.yml` (it can't trusted-publish cross-repository).
-  `pyproject.toml` is now `dynamic = ["version"]` — the version is never hardcoded. `CLAUDE.md`
-  gained a "Versioning & releasing" doctrine covering the Python and VS Code-extension variants.
+- **Release standard: no tags — a merge to `rc`/`release` publishes.** `release.yml` runs
+  `on: push: branches: [rc, release]`: a merge to `rc` publishes a **pre-release** (PyPI
+  `X.Y.ZrcN`), a merge to `release` publishes the **stable** `X.Y.Z`. The version comes entirely
+  from **GitVersion** (single knob `next-version`; `rc` → `SemVer`, `release` →
+  `MajorMinorPatch`), injected at build time (`hatch version`), never hardcoded — `pyproject.toml`
+  is `dynamic = ["version"]`. Publishing is PyPI Trusted Publishing (vendored workflow; the
+  reusable release job — removed from `ci.yml` — can't trusted-publish cross-repository).
+  `GitVersion.yml` was rewritten to a clean **GitVersion 6.x-native** config (a 5.x-style config
+  makes `next-version` fail to parse on GitVersion 6.8+). `CLAUDE.md` gained a "Versioning &
+  releasing" doctrine (Python + VS Code-extension variants) and a rule to **quote failing CI log
+  fragments** back to the user when diagnosing.
 - **Tamed Dependabot + doc-sync exemption.** The `doc-sync` guard now skips dependency PRs
   (the `dependencies` label / `dependabot[bot]` actor) — a version bump carries no doc change.
   `dependabot.yml` opens **one grouped PR per ecosystem** and **ignores breaking major bumps**

@@ -83,7 +83,9 @@ Keep docs in lockstep with the code, **in the same change** — never wait to be
 
 - **(a) Fully automated** — unit/integration tests plus all debugging. Run in GitHub Actions
   CI on every push/PR. Claude **must read and analyze the CI run logs** (`gh run view --log`)
-  for every run — **even when the job is green**.
+  for every run — **even when the job is green**. When a run fails, **quote the actual failing
+  log fragment back to the user** (the real error lines, not just a paraphrase) so a human can
+  follow the diagnosis — then explain the cause and fix.
 - **(b) Dev-machine / AI-sandbox** — tests runnable only on a developer machine or against
   external services, or not fully automatable, run in an **isolated sandbox under Claude's
   control**. Claude runs these itself during development, and again after a release once full
@@ -129,10 +131,17 @@ graph. Branch model: `feature/*` (`-alpha`) → `dev` (`-dev`) → `rc` (`-rc`) 
   publish time. When you must state the version in docs, read it from CI's GitVersion output or
   `docker run --rm -v "$PWD:/repo" gittools/gitversion:6.3.0 /repo /showvariable SemVer`.
 
-**Releasing is a merge, not a tag.** A merge into the **`release`** branch IS the release:
-`release.yml` runs `on: push: branches: [release]`, computes the version with GitVersion,
-injects it into the build, and publishes. To release: bump `next-version` if needed, then merge
-`dev` → `rc` → `release` (approval-gated). `ci.yml` never publishes the package/extension.
+**Releasing is a merge, not a tag.** `release.yml` runs `on: push: branches: [rc, release]` —
+a merge into either branch IS a release:
+
+- merge to **`rc`** → a **pre-release** publish (PyPI `X.Y.ZrcN`; a VS Code extension uses
+  `vsce publish --pre-release`). GitVersion gives the `rc` label + number.
+- merge to **`release`** → the **stable** publish (clean `X.Y.Z`, from GitVersion's
+  `MajorMinorPatch`).
+
+To cut a new number, bump `next-version`; then merge `dev` → `rc` → `release` (approval-gated).
+`ci.yml` never publishes the package/extension. **Uses the latest GitVersion 6.x** — the config
+must be 6.x-native (a 5.x-style config makes `next-version` fail to parse).
 
 - **Python** (this template): `pyproject.toml` is `dynamic = ["version"]` reading
   `<pkg>/__init__.py`; `release.yml` does `hatch version <gitversion>` then builds and publishes
@@ -141,7 +150,8 @@ injects it into the build, and publishes. To release: bump `next-version` if nee
 - **VS Code extension / Node variant** (e.g. the sibling `gitlab-ci-monitor`): `release.yml` sets
   `package.json` from GitVersion (`npm version <gitversion> --no-git-tag-version`), builds the
   `.vsix`, and publishes to the **VS Code Marketplace** (`vsce`, secret `VSCE_PAT`) and optionally
-  **OpenVSX** (`ovsx`, secret `OVSX_PAT`). Same trigger (merge to `release`), same GitVersion source.
+  **OpenVSX** (`ovsx`, secret `OVSX_PAT`). Same trigger (merge to `rc`/`release`) and GitVersion
+  source; a merge to `rc` publishes with `vsce publish --pre-release`.
 
 ## Build, artifacts & CI (apply without being asked)
 
