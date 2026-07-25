@@ -9,6 +9,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **`Features.md` scoped to user-facing features only.** `CLAUDE.md` (Feature backlog) now
+  states the backlog lists only user-facing product features; engineering/infra work
+  (deployment, CI/CD, release, versioning, tooling, refactors, governance) is tracked in
+  `TODO.md`/`CHANGELOG.md`, not the feature backlog. The template's own `Features.md` sample
+  entries were replaced accordingly (health check + CLI) — the scaffold/CI entry moved out.
 - **Release standard: no tags — a merge to `rc`/`release` publishes.** `release.yml` runs
   `on: push: branches: [rc, release]`: a merge to `rc` publishes a **pre-release** (PyPI
   `X.Y.ZrcN`), a merge to `release` publishes the **stable** `X.Y.Z`. The version comes entirely

@@ -19,8 +19,12 @@ _None yet._
 
 ## Delivered
 
-1. **Project scaffold.** Rules (`CLAUDE.md`/`AGENTS.md`), doc-sync + testing policy +
-   per-task lifecycle, backlog/CHANGELOG/TODO, `docs/` (configuration + test catalog),
-   `auto-tests/` (a/b/c), CI pipeline (quality/security/scanners + GHCR image & chart +
-   functional), `Dockerfile` + compose, generic Helm chart, and a portable `SKILL.md`
-   template — all wired so the sample app's CI is green out of the box.
+_Illustrative sample entries — describe the sample app's user-facing behavior. Replace them
+with your product's features. (The scaffold/CI/tooling that ships with the template is not a
+product feature; its history lives in [CHANGELOG.md](CHANGELOG.md), not here.)_
+
+1. **Health check.** The service answers `GET /health` (also `/healthz` and `/`) with a
+   `200` JSON body `{"status": "ok", "version": …}`, so users and uptime monitors can confirm
+   it is live and see which version is running.
+2. **Command-line interface.** An `app` command exposes `app --version` and `app serve`, which
+   starts the HTTP service on the configured host/port (`APP_HOST` / `APP_PORT`).
