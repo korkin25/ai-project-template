@@ -7,6 +7,14 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **Tamed Dependabot + doc-sync exemption.** The `doc-sync` guard now skips dependency PRs
+  (the `dependencies` label / `dependabot[bot]` actor) — a version bump carries no doc change.
+  `dependabot.yml` opens **one grouped PR per ecosystem** and **ignores breaking major bumps**
+  (minor/patch only; majors are a deliberate migration task). Prevents the dep-update swarm from
+  going red out of the box.
+
 ### Added
 
 - Initial template. Canonical rules in `CLAUDE.md`, picked up by every agent via symlinks
