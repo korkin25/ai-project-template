@@ -14,7 +14,9 @@
 #   docker      buildx build -> trivy scan -> push to GHCR on dev/rc/release and tags
 #   helm        lint + template always, package + OCI push to GHCR on tags
 #   functional  runs the repository's own auto-tests/group-a/*.sh scripts
-#   release     sdist + wheel -> PyPI via Trusted Publishing on a v* tag
+#
+# Publishing is a SEPARATE workflow (`release.yml`): NO tags — a merge to the
+# `release` branch publishes the GitVersion number to PyPI via Trusted Publishing.
 #
 # Delete any job you do not want; nothing else needs editing — there is no umbrella
 # workflow that would break when a piece is missing.
@@ -31,8 +33,8 @@ on:
   pull_request:
   workflow_dispatch:
 
-# Least privilege by default. Only the two jobs that publish to GHCR and the one that
-# talks to PyPI widen this, and they widen it for themselves alone.
+# Least privilege by default. Only the two jobs that publish to GHCR widen this, and
+# they widen it for themselves alone.
 permissions:
   contents: read
 
@@ -180,18 +182,8 @@ jobs:
       tests-glob: "*.sh"
       image-ref: ${{ needs.docker.outputs.image-ref }}
 
-  # ---------------------------------------------------------------------------
-  # 8. Publish to PyPI on a version tag, gated behind the Python job.
-  # Trusted Publishing: the job mints a short-lived OIDC token, so there is no
-  # PyPI API token to store or rotate. Configure the publisher on PyPI once.
-  # ---------------------------------------------------------------------------
-  release:
-    name: PyPI
-    needs: [detect, python]
-    if: startsWith(github.ref, 'refs/tags/v') && needs.detect.outputs.has-python == 'true'
-    permissions:
-      id-token: write # OIDC identity for PyPI Trusted Publishing
-      contents: read
-    uses: korkin25/open-ci-actions/.github/workflows/release.yml@v1
-    with:
-      python-version: "3.12"
+  # Publishing is NOT here. It lives in the vendored `release.yml`, which runs on a
+  # merge to the `release` branch (no tags) and publishes the GitVersion number to
+  # PyPI via Trusted Publishing. The reusable open-ci-actions release workflow can't
+  # trusted-publish cross-repository (PyPI `job_workflow_ref` / `invalid-publisher`),
+  # so a self-contained workflow is the pattern.

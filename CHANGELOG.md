@@ -9,6 +9,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Release standard: no tags — a merge to `release` publishes.** `release.yml` now runs
+  `on: push: branches: [release]`, computes the version with **GitVersion** (single knob
+  `next-version` in `GitVersion.yml`, `release` branch label `''` → clean `X.Y.Z`), injects it
+  into the build (`hatch version <semver>`), and publishes to PyPI via Trusted Publishing. The
+  reusable release job was removed from `ci.yml` (it can't trusted-publish cross-repository).
+  `pyproject.toml` is now `dynamic = ["version"]` — the version is never hardcoded. `CLAUDE.md`
+  gained a "Versioning & releasing" doctrine covering the Python and VS Code-extension variants.
 - **Tamed Dependabot + doc-sync exemption.** The `doc-sync` guard now skips dependency PRs
   (the `dependencies` label / `dependabot[bot]` actor) — a version bump carries no doc change.
   `dependabot.yml` opens **one grouped PR per ecosystem** and **ignores breaking major bumps**

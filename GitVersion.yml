@@ -7,13 +7,17 @@
 #   feature/*  → X.Y.Z-alpha.N
 #   dev        → X.Y.Z-dev.N       (mainline integration)
 #   rc         → X.Y.Z-rc.N
-#   release    → X.Y.Z-release.N   (set label: '' below if you want a clean X.Y.Z on release)
-#   tag v*     → that exact version
+#   release    → X.Y.Z            (clean, label: '' — this is what release.yml publishes)
+#   (no git tags — the release number is `next-version` below)
 #
 # GitLab CI reads this via auto-semversioning; GitHub Actions runs GitVersion in a `version`
 # job and reuses the same number — so both CIs and the docs agree on one version.
 mode: ContinuousDelivery
 tag-prefix: v
+# The single version knob (there are no git tags). Set this to the next release
+# number; `release.yml` publishes exactly this from the `release` branch. Bump it
+# to cut a new minor/major, then merge dev -> rc -> release.
+next-version: 0.1.0
 
 branches:
   dev:
@@ -34,10 +38,14 @@ branches:
       - dev
 
   release:
+    # Publishing branch: a merge here IS the release (no tags). Empty label ->
+    # a clean SemVer (X.Y.Z, no pre-release suffix) is what release.yml ships.
+    # The target number is the single knob `next-version` below (bump it to cut a
+    # new minor/major); GitVersion increments Patch from there per merge.
     regex: ^(origin/)?release$
     mode: ContinuousDelivery
-    label: release
-    increment: Major
+    label: ""
+    increment: Patch
     is-release-branch: true
     source-branches:
       - rc
