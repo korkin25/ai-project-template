@@ -1,0 +1,13 @@
+{
+  "name": "app",
+  "description": "Template: bundles this project's Agent Skills. Replace name/description and list your skills.",
+  "version": "0.1.0",
+  "author": {
+    "name": "you",
+    "url": "https://github.com/OWNER"
+  },
+  "homepage": "https://github.com/OWNER/REPO",
+  "repository": "https://github.com/OWNER/REPO",
+  "license": "MIT",
+  "keywords": ["template"]
+}

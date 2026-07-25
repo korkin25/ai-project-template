@@ -1,0 +1,9 @@
+{{ .Chart.Name }} {{ .Chart.AppVersion }} deployed as {{ include "app.fullname" . }}.
+
+Image:   {{ include "app.image" . }}
+Command: {{ .Values.command | join " " }}
+
+Reach the service from inside the cluster:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "app.fullname" . }} 8080:{{ .Values.service.port }}
+  curl -s localhost:8080/health

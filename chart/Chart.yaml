@@ -1,0 +1,10 @@
+---
+apiVersion: v2
+# Template: rename to your service.
+name: app
+description: Generic application service (ai-project-template).
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+maintainers:
+  - name: you

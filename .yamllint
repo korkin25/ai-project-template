@@ -1,0 +1,23 @@
+# yamllint config tuned for GitHub Actions + Helm YAML.
+extends: default
+
+rules:
+  # Long lines are common in workflow run-steps and Helm values — warn, don't fail.
+  line-length:
+    max: 120
+    level: warning
+  # GitHub Actions uses `on:` as a key; don't treat it as a truthy value.
+  truthy:
+    check-keys: false
+  # `---` document start is optional here.
+  document-start: disable
+  # Helm/compose commonly use inline empty `{}` / `[]`.
+  braces:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+  comments:
+    min-spaces-from-content: 1
+
+ignore: |
+  .venv/
+  chart/templates/

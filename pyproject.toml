@@ -1,0 +1,50 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+# Template: rename "app" everywhere to your package/dist name.
+name = "app"
+version = "0.1.0"
+description = "Sample service for the ai-project-template (replace me)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{ name = "you" }]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-cov>=5",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "bandit>=1.7",
+    "pip-audit>=2.7",
+    "build",
+]
+
+[project.scripts]
+app = "app.cli:main"
+app-serve = "app.server:run"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/app"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.mypy]
+files = ["src", "tests"]
+python_version = "3.11"
+ignore_missing_imports = true
+
+[tool.bandit]
+# The sample service binds all interfaces by default (0.0.0.0); exposure is
+# controlled by the container/k8s, not the process. See src/app/server.py.
+skips = ["B104"]

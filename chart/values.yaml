@@ -1,0 +1,136 @@
+---
+# Default values for the generic app chart.
+# Adapted for a portable GitHub/GHCR deployment (no ArgoCD/ESO/GatewayAPI coupling).
+
+replicaCount: 1
+
+image:
+  # Template: CI publishes ghcr.io/<owner>/<repo>. Set repository to that.
+  repository: ghcr.io/OWNER/REPO
+  tag: ""            # empty ⇒ chart appVersion
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# The command the container runs. Default: serve the HTTP service.
+command: ["app-serve"]
+args: []
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+automountServiceAccountToken: false
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  fsGroup: 10000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 10000
+  runAsGroup: 10000
+  capabilities:
+    drop:
+      - ALL
+
+containerPort: 8080
+
+env:
+  APP_HOST: "0.0.0.0"
+  APP_PORT: "8080"
+
+# Extra env from an existing Secret (create it out-of-band; the chart never templates values).
+envFrom:
+  secret:
+    enabled: false
+    name: ""
+
+# The sample app exposes GET /health.
+livenessProbe:
+  enabled: true
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 20
+readinessProbe:
+  enabled: true
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 3
+  periodSeconds: 10
+startupProbe:
+  enabled: true
+  httpGet:
+    path: /health
+    port: http
+  failureThreshold: 30
+  periodSeconds: 3
+
+# Optional persistent data volume (off by default — the sample is stateless).
+# For advanced needs (e.g. a large read-only cache kept out of the image) use extraVolumes.
+persistence:
+  enabled: false
+  storageClass: ""
+  accessModes: ["ReadWriteOnce"]
+  size: 1Gi
+  mountPath: /data
+  annotations: {}
+
+service:
+  enabled: true
+  type: ClusterIP
+  port: 80
+  annotations: {}
+  labels: {}
+
+# Routing via the Gateway API (HTTPRoute) — the modern standard, preferred over Ingress.
+# Attach to an existing Gateway (set parentRefs); no controller-specific annotations needed.
+gatewayApi:
+  enabled: false
+  parentRefs:
+    - name: ""          # e.g. shared-gateway
+      namespace: ""     # e.g. networking (omit for same namespace)
+      sectionName: ""   # e.g. https (the listener name)
+  hostnames: []         # e.g. [app.example.com]
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendPort: 80   # Service port; defaults to service.port
+
+serviceMonitor:
+  enabled: false
+  path: /metrics
+  interval: 30s
+  labels: {}
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  maxUnavailable: ""
+
+resources: {}
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+extraVolumes: []
+extraVolumeMounts: []

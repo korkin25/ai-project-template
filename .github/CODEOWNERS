@@ -1,0 +1,10 @@
+# Required reviewers per path (gitignore-style globs → GitHub users/teams).
+# Template: replace @OWNER with your user/team.
+
+# Default owner for everything.
+*                       @OWNER
+
+# The rules and CI are load-bearing — guard them.
+/CLAUDE.md              @OWNER
+/.github/               @OWNER
+/chart/                 @OWNER
