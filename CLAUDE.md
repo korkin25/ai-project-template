@@ -151,7 +151,7 @@ in this repo.** The gates below describe what those reusable workflows run.
 - Newly-added scanners start in report mode (soft-fail / `continue-on-error`); tighten to
   hard gates once the baseline is clean — never silently drop one.
 - **Language coverage:** the language-specific gates (ruff/mypy/pytest, radon/xenon,
-  bandit/pip-audit/semgrep, CodeQL) run **only when a Python project is detected**
+  bandit/pip-audit/semgrep) run **only when a Python project is detected**
   (`pyproject.toml`) and skip on other languages. The language-agnostic gates (checkov,
   hadolint, trivy, gitleaks, image build, Helm chart, functional) always run. For another
   stack, add that language's lint/type/test/SAST jobs next to the Python ones.
@@ -251,7 +251,7 @@ practice — <https://github.com/CloudDefenseAI/secure-agents-md>):
   production deploys, mass edits, and anything outward-facing require explicit approval —
   approval in one context does not extend to the next.
 - **Supply-chain discipline.** New dependencies get a reason; pin versions; let Dependabot +
-  the CI scanners (pip-audit, trivy, checkov, semgrep, CodeQL) gate them. Don't add a
+  the CI scanners (pip-audit, trivy, checkov, semgrep) gate them. Don't add a
   dependency to skip a small amount of code.
 - **Directory overrides.** Sensitive directories may carry a narrower `AGENTS.override.md`;
   the closest override wins for files under it.

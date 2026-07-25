@@ -23,7 +23,7 @@ or any Agent-Skills runtime) knows exactly how to work in the repo from `CLAUDE.
 | **Skills** | [`skills/`](skills/) — portable `SKILL.md` template + authoring guide; [`.claude-plugin/`](.claude-plugin/) — marketplace/plugin manifests |
 | **Multi-agent pickup** | `CLAUDE.md` is the one rulebook; `AGENTS.md`, `GEMINI.md`, `.cursorrules`, `.clinerules`, `.windsurfrules`, `.github/copilot-instructions.md` symlink to it, `.cursor/rules/*.mdc` points to it — Codex/Cursor/Copilot/Gemini/Cline/Windsurf all load the same rules |
 | **Stay-in-context** | a `CLAUDE.md` router ("context map"), a per-turn reminder hook (`.claude/settings.json`), and a CI `doc-sync` guard so agents don't forget the docs/tests/skills |
-| **Community & security** | `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `.github/` (CODEOWNERS, dependabot, issue/PR templates), CodeQL workflow, `.pre-commit-config.yaml` (gitleaks via Docker), `.editorconfig`, `Makefile` |
+| **Community & security** | `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `.github/` (CODEOWNERS, dependabot, issue/PR templates), `.pre-commit-config.yaml` (gitleaks via Docker), `.editorconfig`, `Makefile` |
 | **Sample app** | [`src/app/`](src/app/) — a tiny working Python service so the template's own CI is green out of the box |
 
 The sample `app` exists only to keep the pipeline green and demonstrate the shape; replace
