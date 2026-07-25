@@ -9,6 +9,8 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **GitHub Releases on stable.** `release.yml` now, on a `release`-branch build, tags `vX.Y.Z` and cuts a GitHub Release (auto-notes + built artifacts). Pre-releases (`rc`) publish to the registry only (no tag), so pre-release tags never confuse GitVersion; the version stays driven by `next-version`. Doctrine updated in CLAUDE.md.
+
 - **`Features.md` scoped to user-facing features only.** `CLAUDE.md` (Feature backlog) now
   states the backlog lists only user-facing product features; engineering/infra work
   (deployment, CI/CD, release, versioning, tooling, refactors, governance) is tracked in
