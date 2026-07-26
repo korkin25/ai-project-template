@@ -1,7 +1,7 @@
 <!-- GENERATED FILE — DO NOT EDIT.
      Sources : standard/base.md + standard/profiles/service.md + standard/repo.env
      Profile : service
-     Sources-SHA256: 0a25d85118484c3133767103feb90aae0006d4033001a2a2785861bcbd259a96
+     Sources-SHA256: bc61489ff85cca70660866b36133f7a7c6638fa9562ad9610a711ea5245fac67
      Regenerate: ./standard/compose.sh
      Edit the sources, never this file. CI fails a change where the two disagree.
 -->
@@ -164,6 +164,38 @@ that must never go stale.
 **Consuming someone else's contract:** pin the version you tested against, and never rely on
 behaviour that is not written in their `docs/contracts.md`. If you need something that is not
 documented, that is a request to the owning repo, not an assumption.
+
+### Database schema — Liquibase, always
+
+**Every change to a database schema is a Liquibase changeset. No exceptions.** Not a hand-run
+`ALTER TABLE`, not a `psql` session against a live database, not an ORM's auto-migration, not
+a SQL file applied by hand "just this once".
+
+The reason is not tidiness. A schema is a **cross-repo contract**: several services read and
+write the same tables, and unlike code there is no compiler to catch a rename. Liquibase is
+what makes a schema change reviewable before it runs, repeatable across environments, ordered
+deterministically, and — the part that matters at 3am — reversible.
+
+Rules that follow from it:
+
+- **The changelog is the schema.** If the database has something the changelog does not
+  describe, the database is wrong, not the changelog. A drift between the two is an incident,
+  not a curiosity.
+- **Changesets are append-only.** Never edit a changeset that has run anywhere; write a new
+  one. Liquibase tracks applied changesets by checksum, and editing one makes every
+  environment disagree about whether it ran.
+- **Every changeset carries a rollback**, or an explicit statement of why it cannot have one.
+  "We will restore from backup" is an answer, but it has to be written down before the change
+  ships, not discovered afterwards.
+- **Additive first, exactly as with any other contract**: add a column, backfill, switch
+  readers, then drop the old one — in separate changesets and usually separate releases. A
+  rename is never a single step.
+- **Migrations run as their own step, before the code that needs them**, never from
+  application startup. A service that migrates on boot turns a rollout into a race between
+  replicas.
+- **Ownership is explicit.** The changelog lives with whoever owns the schema — for a shared
+  database, that is the platform, not any one service. A service that needs a table it does
+  not own opens a request there; it does not add a changeset to somebody else's domain.
 
 ### The service ↔ platform interface
 

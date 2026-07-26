@@ -34,12 +34,19 @@
 # over a decision it cannot make consistently across environments.
 include:
   - project: "open_ci_cd/templates"
-    # PINNED TO A TAG — never `ref: "main"`.
+    # WHAT THIS REF COSTS YOU.
     # These templates are executed code from another repository: whatever `ref` points at
     # runs with this project's CI_JOB_TOKEN, its registry credentials and its signing key.
-    # On a moving branch a single upstream commit changes every service's pipeline at once,
-    # with no MR, no review and no way to reproduce yesterday's build. Bump this pin in an
-    # MR like any other dependency, and read the templates' CHANGELOG when you do.
+    # A tag makes builds reproducible and turns a template upgrade into a reviewed, per-repo
+    # act. A moving branch does the opposite — one upstream commit changes every repo's
+    # pipeline at once, with no MR and no way to reproduce yesterday's build.
+    #
+    # This platform tracks `main` by DELIBERATE CHOICE: the templates repo has no usable
+    # tag (its only tag trails main by hundreds of commits and is missing five of the eight
+    # files included below, so pinning to it breaks every pipeline). Same-day access to
+    # template fixes is worth more than reproducibility at this stage. Revisit when that
+    # repo starts cutting real releases — and before "fixing" this to a tag, check that the
+    # tag actually contains every file in the list.
     ref: "@@CI_TEMPLATES_REF@@"
     file:
       - "/globals.yml"
