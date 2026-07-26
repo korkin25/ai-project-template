@@ -15,6 +15,16 @@ Other repos may depend on these. Changing one follows the protocol below.
 | Endpoint | Method | Response | Consumers |
 |---|---|---|---|
 | `/health` | `GET` | `200` + `{"status": "ok"\|"draining", "version": "<semver>"}` | the chart's probes; the platform's tier-(d) tests |
+| `/metrics` | `GET` | `200` + Prometheus text exposition, `Content-Type: text/plain; version=0.0.4` | the cluster's Prometheus, via the chart's `ServiceMonitor` (`serviceMonitor.path`) |
+
+`/metrics` is listed because **something outside this repo reads it**, which is the only test
+that matters here — it is scraped on a schedule by an operator nobody in this repo configures.
+Its consumer is also the quietest one: a scrape against a path this process stopped serving
+does not fail anything, it produces an empty panel weeks later with no alert, because the
+alert needs the series that never arrived. The metric NAMES are not pinned here on purpose —
+adding a series is additive and safe, whereas the endpoint, its port and its exposition format
+are what a consumer builds on. The pairing with `helm/templates/servicemonitor.yaml` is part
+of the contract: the handler and the flag move in the same change, never separately.
 
 ### Messages / topics
 
