@@ -9,7 +9,7 @@ Run it against whichever cluster the current kubecontext points at::
 
     check-requirements.py                       # required items only decide the exit code
     check-requirements.py --strict              # optional items fail too
-    check-requirements.py --context laptop-local
+    check-requirements.py --context example-cluster
 
 Exit codes: 0 all satisfied · 1 something required is missing · 2 cannot reach the cluster.
 

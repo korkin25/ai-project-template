@@ -51,8 +51,8 @@ registry.
 One commit produces one image and one chart, at the same `GitVersion_SemVer`:
 
 ```
-commit ──► CI ──► image  registry.gitlab.com/@@GROUP@@/@@PROJECT@@:<SemVer>
-                └► chart oci://registry.gitlab.com/job-agent/charts/@@PROJECT@@:<SemVer>
+commit ──► CI ──► image  <registry>/@@GROUP@@/@@PROJECT@@:<SemVer>
+                └► chart oci://<registry>/<group>/charts/@@PROJECT@@:<SemVer>
                                               │
                           platform repo bundle.yaml pins chartVersion
                                               │

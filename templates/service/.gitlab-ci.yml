@@ -2,7 +2,7 @@
 # CI/CD for @@PROJECT@@ — profile: service.
 #
 # WHY THIS FILE IS ALMOST EMPTY.
-# The pipeline is a COMPOSITION of the shared templates in `open_ci_cd/templates`, never a
+# The pipeline is a COMPOSITION of the shared templates in `@@CI_TEMPLATES_PROJECT@@`, never a
 # set of inline jobs. Every job in this pipeline arrives through an include; this file only
 # declares *which* templates apply, *what* this repo is called, and *where* its jobs run.
 # New shared CI logic belongs in the templates repo, so every repo gets it at once — a job
@@ -33,7 +33,7 @@
 # that environment's bundle.yaml. A service pipeline that runs `kubectl apply` has taken
 # over a decision it cannot make consistently across environments.
 include:
-  - project: "open_ci_cd/templates"
+  - project: "@@CI_TEMPLATES_PROJECT@@"
     # WHAT THIS REF COSTS YOU.
     # These templates are executed code from another repository: whatever `ref` points at
     # runs with this project's CI_JOB_TOKEN, its registry credentials and its signing key.
@@ -41,12 +41,13 @@ include:
     # act. A moving branch does the opposite — one upstream commit changes every repo's
     # pipeline at once, with no MR and no way to reproduce yesterday's build.
     #
-    # This platform tracks `main` by DELIBERATE CHOICE: the templates repo has no usable
-    # tag (its only tag trails main by hundreds of commits and is missing five of the eight
-    # files included below, so pinning to it breaks every pipeline). Same-day access to
-    # template fixes is worth more than reproducibility at this stage. Revisit when that
-    # repo starts cutting real releases — and before "fixing" this to a tag, check that the
-    # tag actually contains every file in the list.
+    # So pin a TAG, and before pinning check that the tag actually contains every file in
+    # the list below — a tag that trails the default branch is usually missing some of them,
+    # and the pipeline fails with "file not found" rather than with anything explanatory.
+    # If no such tag exists yet, tracking the default branch is a deliberate, temporary
+    # trade: record HERE which branch, why, and what has to become true to move to a tag.
+    # An undocumented moving ref is indistinguishable from an oversight, and nobody dares
+    # touch it afterwards.
     ref: "@@CI_TEMPLATES_REF@@"
     file:
       - "/globals.yml"
@@ -119,23 +120,25 @@ variables:
 # The tag must be a LITERAL. GitLab expands variables in `tags`, but not nested references
 # (gitlab-org/gitlab#407129): `tags: [$RUNNER_TAG]` where RUNNER_TAG itself holds `$OTHER`
 # yields the literal string as a tag and the job hangs in `pending` with no matching runner.
-# `job-agent-local` is the group's self-hosted runner, registered by the infra repo. Replace
-# it with your fleet's tag in all four blocks — they must stay in sync.
+# Substitute `@@RUNNER_TAG@@` with the literal tag of the runner fleet your infra repo
+# registered, in all four blocks below — they must stay in sync. Keep it QUOTED while it is
+# still a token: a plain YAML scalar may not begin with `@`, and the parser reports that as
+# a syntax error somewhere else in the file.
 .default_runner:
   tags:
-    - job-agent-local
+    - "@@RUNNER_TAG@@"
 
 .default_runner_infra:
   tags:
-    - job-agent-local
+    - "@@RUNNER_TAG@@"
 
 get_unique_semversion:
   tags:
-    - job-agent-local
+    - "@@RUNNER_TAG@@"
 
 SBOM-cyclonedx-image:
   tags:
-    - job-agent-local
+    - "@@RUNNER_TAG@@"
 
 # Project-specific jobs (migrations, extra gates) go below. Think twice: if the job would be
-# useful to a second repo, it belongs in open_ci_cd/templates instead.
+# useful to a second repo, it belongs in @@CI_TEMPLATES_PROJECT@@ instead.

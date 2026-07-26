@@ -22,9 +22,9 @@ agent) reads it and must know what to do without re-deriving anything.
 
 `@@PREFIX@@-<n>` for tasks, `@@PREFIX@@-D<n>` for decisions. Numbers are sequential within
 this repo and **never reused**; the prefix is unique across the group, so a consuming repo
-can cite an id directly. Work spanning repos also carries a platform id (`JAP-<n>`):
+can cite an id directly. Work spanning repos also carries a platform id (`<PLATFORM>-<n>`):
 
-| @@PREFIX@@-14 | 🟡 | Add `Envelope.trace_id` | part of JAP-7; consumers are DISP-3, PROC-9 |
+| @@PREFIX@@-14 | 🟡 | Add `Envelope.trace_id` | part of <PLATFORM>-7; consumers are <OTHER-A>-3, <OTHER-B>-9 |
 
 ## Open tasks
 

@@ -15,7 +15,7 @@ release is a rename of that heading rather than an archaeology exercise.
 ### Added
 
 - Repository scaffolded from the shared `service` template: composition-only GitLab CI
-  pinned to a tagged `open_ci_cd/templates`, `deploy/Dockerfile` + `helm/` at the canonical
+  pinned to a tagged `@@CI_TEMPLATES_PROJECT@@`, `deploy/Dockerfile` + `helm/` at the canonical
   paths, hardened chart, tier-(a) unit and image smoke tests, and the full doc set.
 
 ### Changed

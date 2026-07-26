@@ -40,7 +40,7 @@ contract — needing it is a request to that repo, not an assumption.
 
 ## Changing a contract you own
 
-1. **Design it as a platform decision.** Open `JAP-D<n>` in the platform repo: what changes,
+1. **Design it as a platform decision.** Open `<PLATFORM>-D<n>` in the platform repo: what changes,
    who consumes it today, whether it is compatible, and the migration path. A breaking
    change is an architectural decision and **requires the user's approval**.
 2. **Prefer additive.** Add a field; do not repurpose one. Add a topic or a version suffix;

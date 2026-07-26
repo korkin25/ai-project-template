@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://gitlab.com/job-agent/platform/gitops/-/raw/dev/bundle.schema.json",
+  "$id": "https://gitlab.com/<group>/<platform-repo>/-/raw/dev/bundle.schema.json",
   "title": "Environment bundle",
   "description": "One bundle describes exactly one deployable environment (one Kubernetes namespace): what runs there and at which version. It never describes HOW something is deployed (that is the chart) nor WITH WHAT configuration (that is values/). It is the only file a release touches, and the only file the renderer reads.",
   "type": "object",
@@ -11,7 +11,7 @@
       "type": "string",
       "minLength": 1,
       "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$",
-      "description": "Unique bundle identifier, used as the prefix of every generated resource name (e.g. 'job-agent-dev' -> HelmRelease 'job-agent-dev-processing')."
+      "description": "Unique bundle identifier, used as the prefix of every generated resource name (e.g. '<platform>-dev' -> HelmRelease '<platform>-dev-<service>'). Must contain the environment directory name, because promotion between environments relies on that correspondence."
     },
     "namespace": {
       "type": "string",

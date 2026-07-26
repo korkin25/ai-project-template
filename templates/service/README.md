@@ -8,8 +8,8 @@ container image and a Helm chart, at the same version — and it never deploys i
 
 | | |
 |---|---|
-| Image | `registry.gitlab.com/@@GROUP@@/@@PROJECT@@` |
-| Chart (OCI) | `oci://registry.gitlab.com/job-agent/charts/@@PROJECT@@` |
+| Image | `<registry>/@@GROUP@@/@@PROJECT@@` |
+| Chart (OCI) | `oci://<registry>/<group>/charts/@@PROJECT@@` |
 | Entrypoint | `python -m @@PKG@@.main` |
 | Rules | [`CLAUDE.md`](CLAUDE.md) — generated from `standard/`, read it before changing anything |
 
@@ -28,8 +28,10 @@ container image and a Helm chart, at the same version — and it never deploys i
 
 1. Replace every placeholder: `@@PROJECT@@` (hyphenated repo/image/chart name), `@@PKG@@`
    (underscored Python package, also the `src/@@PKG@@/` directory), `@@PREFIX@@` (ticket
-   prefix), `@@GROUP@@` (GitLab namespace), `@@DESCRIPTION@@`, and `@@CI_TEMPLATES_REF@@`
-   (the tag of `open_ci_cd/templates` to pin).
+   prefix), `@@GROUP@@` (GitLab namespace), `@@DESCRIPTION@@`,
+   `@@CI_TEMPLATES_PROJECT@@` (the shared CI templates repo, as a GitLab project path),
+   `@@CI_TEMPLATES_REF@@` (the tag of it to pin) and `@@RUNNER_TAG@@` (the tag of your
+   runner fleet — it appears in four blocks of `.gitlab-ci.yml` that must stay in sync).
    `grep -rnE '@{2}' .` must come back empty when you are done.
 2. Run `./standard/compose.sh` to generate `CLAUDE.md`, and commit it.
 3. Set `next-version` in `GitVersion.yml` to the first version you intend to release.
@@ -84,12 +86,12 @@ helm lint helm
 
 ## CI/CD
 
-`.gitlab-ci.yml` is a **composition** of `open_ci_cd/templates`, pinned to a tag — there are
-no inline jobs, and new shared CI logic belongs in that repo rather than here. The pipeline
-versions (GitVersion), lints and type-checks, scans (checkov / trivy / gitleaks / semgrep /
-bandit / pip-audit / hadolint), builds and signs the image, packages the chart at the same
-SemVer, runs `auto-tests/group-a/*.sh` against the built image, and commits `.versions/*.env`
-back.
+`.gitlab-ci.yml` is a **composition** of the shared CI templates repo, pinned to a tag —
+there are no inline jobs, and new shared CI logic belongs in that repo rather than here. The
+pipeline versions (GitVersion), lints and type-checks, scans (checkov / trivy / gitleaks /
+semgrep / bandit / pip-audit / hadolint), builds and signs the image, packages the chart at
+the same SemVer, runs `auto-tests/group-a/*.sh` against the built image, and commits
+`.versions/*.env` back.
 
 It never touches a cluster. See `docs/architecture.md` for the deployment shape.
 

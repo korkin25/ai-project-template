@@ -10,18 +10,21 @@
 # ClusterSecretStore/vault" is a requirement; "deploy HashiCorp Vault with these values" is
 # the infra repo's business and none of ours.
 
-apiVersion: platform.job-agent/v1
+# `example-platform` is a scaffold name — rename it, the API group, and the namespace it
+# names further down. check-requirements.py prints the name in its header, so it is how a
+# human reading an infra ticket knows which platform is asking for what.
+apiVersion: platform.example.com/v1
 kind: InfrastructureRequirements
 metadata:
-  name: job-agent
-  description: Event-driven job ingestion, matching and auto-apply platform.
+  name: example-platform
+  description: Event-driven ingestion, enrichment and query platform.
 
 cluster:
   kubernetesVersion: ">=1.31.0"
   # A default class is required because charts that request storage do not name one.
   storageClasses:
     - name: "*default*"
-      reason: Postgres, the message bus and the vector store all request PVCs.
+      reason: The SQL store, the message bus and the vector store all request PVCs.
 
 # Controllers that must already be running. Checked by the presence of their CRDs plus at
 # least one Ready pod, because an installed CRD with no controller is the failure mode that
@@ -70,51 +73,58 @@ namedResources:
     required: true
 
   - kind: Namespace
-    name: job-agent
+    name: example-platform
     reason: Every workload is deployed here. Created by the infra repo, not by the bundle.
     required: true
 
   - kind: Secret
     name: gitlab-registry
-    namespaces: [job-agent, flux-system]
+    namespaces: [example-platform, flux-system]
     reason: >-
-      Pulls both the private images and the private OCI charts. Needed in job-agent for the
-      pods and in flux-system for the OCIRepository — a very common half-configuration.
+      Pulls both the private images and the private OCI charts. Needed in the workload
+      namespace for the pods and in flux-system for the OCIRepository — configuring only one
+      of the two is a very common half-configuration.
     required: true
 
 # Data services the application depends on. Declared as capabilities so the infra repo may
 # satisfy them with an operator, a managed service, or a plain chart — the platform does not
 # care, it only needs the endpoint to exist and the credentials to be in the secret store.
+#
+# Each `capability` names a WIRE CONTRACT and the properties the code actually relies on —
+# never a product. "PostgreSQL >=16" is a protocol and a version the client library must
+# speak; "deploy CloudNativePG with these values" is a choice the infra repo gets to make.
+# A product name here quietly rules out the managed service, and the day someone swaps the
+# operator the requirement reads as unmet while everything works.
 dataServices:
-  - name: postgres
+  - name: sql
     capability: PostgreSQL >=16, logical replication enabled (wal_level=logical)
     reason: >-
       Primary store. Logical replication is not optional — change data capture streams the
-      write-ahead log into the bus to keep the vector store in sync.
-    credentialsAt: "{vaultPathPrefix}/postgres"
+      write-ahead log into the bus, which is how derived stores stay in sync.
+    credentialsAt: "{vaultPathPrefix}/sql"
     required: true
 
   - name: message-bus
-    capability: Kafka-compatible bus (Redpanda or Kafka), 3 partitions per topic minimum
+    capability: Kafka-compatible bus, at least 3 partitions per topic
     reason: Every inter-service message crosses it. The whole pipeline is asynchronous.
     credentialsAt: "{vaultPathPrefix}/message-bus"
     required: true
 
   - name: vector-store
-    capability: Qdrant, cosine distance, named collections
-    reason: Semantic search over postings and candidate profiles.
+    capability: Vector similarity search over named collections, cosine distance
+    reason: Semantic retrieval over the documents this platform ingests.
     credentialsAt: "{vaultPathPrefix}/vector-store"
     required: true
 
   - name: cache
-    capability: Redis >=7
-    reason: Cursors, rate-limit buckets and chat session state.
+    capability: Redis-compatible key-value store with TTL eviction
+    reason: Cursors, rate-limit buckets and short-lived session state.
     credentialsAt: "{vaultPathPrefix}/cache"
     required: false
 
   - name: cdc
-    capability: Debezium-compatible CDC from PostgreSQL into the message bus
-    reason: Keeps the vector store in sync without the writing service knowing about it.
+    capability: Change data capture from the SQL store into the message bus
+    reason: Keeps derived stores in sync without the writing service knowing they exist.
     required: false
 
 # Model access. Exactly one of these must be satisfiable; the platform prefers the in-cluster
@@ -128,7 +138,7 @@ modelAccess:
     required: false
 
   - name: hosted-api
-    capability: Anthropic, OpenAI or OpenRouter API reachable from the cluster
+    capability: Hosted LLM API reachable from the cluster (egress plus a key in the store)
     credentialsAt: "{vaultPathPrefix}/llm"
     reason: The general case, and the fallback when no GPU node is available.
     required: false

@@ -21,9 +21,9 @@ agent) reads it and must know what to do without re-deriving anything.
 `@@PREFIX@@-<n>` for tasks, `@@PREFIX@@-D<n>` for decisions. Numbers are sequential within
 this repo and **never reused**; the prefix is unique across the group, so an id can be cited
 from another repo without qualification. Work spanning repos also carries a platform id
-(`JAP-<n>`), referenced from the local ticket:
+(`<PLATFORM>-<n>`), referenced from the local ticket:
 
-| @@PREFIX@@-14 | 🟡 | Emit `apply-dispatch` v2 | part of JAP-7; consumer side is DISP-3 |
+| @@PREFIX@@-14 | 🟡 | Emit the v2 event shape | part of <PLATFORM>-7; consumer side is <OTHER>-3 |
 
 ## Open tasks
 

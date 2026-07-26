@@ -29,8 +29,11 @@ its primary product** — ahead of any feature.
 
 1. Replace every placeholder: `@@PROJECT@@` (hyphenated package/repo name), `@@PKG@@`
    (underscored Python package, also the `src/@@PKG@@/` directory), `@@PREFIX@@` (ticket
-   prefix), `@@GROUP@@` (GitLab namespace), `@@DESCRIPTION@@`, `@@CI_TEMPLATES_REF@@` (the
-   tag of `open_ci_cd/templates` to pin). `grep -rnE '@{2}' .` must come back empty.
+   prefix), `@@GROUP@@` (GitLab namespace), `@@DESCRIPTION@@`, `@@CI_TEMPLATES_PROJECT@@`
+   (the shared CI templates repo, as a GitLab project path), `@@CI_TEMPLATES_REF@@` (the tag
+   of it to pin) and `@@RUNNER_TAG@@` (the tag of your runner fleet — it appears in three
+   blocks of `.gitlab-ci.yml` that must stay in sync).
+   `grep -rnE '@{2}' .` must come back empty.
 2. Run `./standard/compose.sh` to generate `CLAUDE.md`, and commit it.
 3. Set `next-version` in `GitVersion.yml` to the first version you intend to publish.
 4. Replace the sample `Envelope` with the real API — and update `docs/contracts.md` in the

@@ -11,7 +11,7 @@
 # adding a deploy/Dockerfile here would silently start producing an image — which is the
 # signal that the repo has stopped being a library.
 include:
-  - project: "open_ci_cd/templates"
+  - project: "@@CI_TEMPLATES_PROJECT@@"
     # WHAT THIS REF COSTS YOU.
     # These templates are executed code from another repository: whatever `ref` points at
     # runs with this project's CI_JOB_TOKEN, its registry credentials and its signing key.
@@ -19,12 +19,13 @@ include:
     # act. A moving branch does the opposite — one upstream commit changes every repo's
     # pipeline at once, with no MR and no way to reproduce yesterday's build.
     #
-    # This platform tracks `main` by DELIBERATE CHOICE: the templates repo has no usable
-    # tag (its only tag trails main by hundreds of commits and is missing five of the eight
-    # files included below, so pinning to it breaks every pipeline). Same-day access to
-    # template fixes is worth more than reproducibility at this stage. Revisit when that
-    # repo starts cutting real releases — and before "fixing" this to a tag, check that the
-    # tag actually contains every file in the list.
+    # So pin a TAG, and before pinning check that the tag actually contains every file in
+    # the list below — a tag that trails the default branch is usually missing some of them,
+    # and the pipeline fails with "file not found" rather than with anything explanatory.
+    # If no such tag exists yet, tracking the default branch is a deliberate, temporary
+    # trade: record HERE which branch, why, and what has to become true to move to a tag.
+    # An undocumented moving ref is indistinguishable from an oversight, and nobody dares
+    # touch it afterwards.
     ref: "@@CI_TEMPLATES_REF@@"
     file:
       - "/globals.yml"           # stages, runner-tag anchors, shared variables
@@ -66,26 +67,27 @@ variables:
 #
 # The tag must be a LITERAL: GitLab expands variables in `tags` but not nested references
 # (gitlab-org/gitlab#407129), so a variable holding another variable becomes a literal tag
-# string and the job never matches a runner. `job-agent-local` is the group's self-hosted
-# runner, registered by the infra repo — replace it with your fleet's tag in all three
-# blocks, which must stay in sync.
+# string and the job never matches a runner. Substitute `@@RUNNER_TAG@@` with the literal tag
+# of the runner fleet your infra repo registered, in all three blocks below — they must stay
+# in sync. Keep it QUOTED while it is still a token: a plain YAML scalar may not begin with
+# `@`, and the parser reports that as a syntax error somewhere else in the file.
 .default_runner:
   tags:
-    - job-agent-local
+    - "@@RUNNER_TAG@@"
 
 .default_runner_infra:
   tags:
-    - job-agent-local
+    - "@@RUNNER_TAG@@"
 
 get_unique_semversion:
   tags:
-    - job-agent-local
+    - "@@RUNNER_TAG@@"
 
 # ---------------------------------------------------------------------------------------
 # Publish to the group PyPI registry
 # ---------------------------------------------------------------------------------------
 # Inline rather than included because the shared templates have no Python publish job yet.
-# If a second repo needs this, MOVE IT INTO open_ci_cd/templates instead of copying it —
+# If a second repo needs this, MOVE IT INTO @@CI_TEMPLATES_PROJECT@@ instead of copying it —
 # a publish job duplicated across repos is a supply-chain surface maintained in n places.
 publish_pypi:
   stage: package

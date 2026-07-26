@@ -1,0 +1,28 @@
+---
+# Development environment on the cluster whose directory this file lives under.
+# The only file a release touches: bump chartVersion here, in a merge request.
+#
+# `example-cluster`, `example-platform` and `example-service` are scaffold names. Rename the
+# cluster directory to your real kubecontext and these values to your platform's, in one
+# change. They are literal strings rather than `@@TOKEN@@` placeholders because
+# `bundle.schema.json` constrains `name` and `namespace` to DNS labels, and
+# `validate-bundles.py` requires the bundle name to contain the environment directory name —
+# a placeholder carrying `@` or `<` would fail this repo's own gate on the first pipeline.
+name: example-platform-dev
+namespace: example-platform
+imageRegistry: <registry>/<group>
+vaultPathPrefix: dev
+# Provisioned by the infra repo into BOTH this namespace and flux-system, rendered from the
+# secret store by an ExternalSecret. Not created here.
+imagePullSecret: gitlab-registry
+interval: 30m
+
+microservices:
+  # Deploy one trivial service first: it validates the CI -> OCI -> Flux delivery path end to
+  # end before any real workload depends on it. Version read from that service's committed
+  # .versions/helm-chart.env — never typed from memory.
+  - service: example-service
+    repoURL: oci://<registry>/<group>/charts
+    chartVersion: 0.1.0
+
+platform: []

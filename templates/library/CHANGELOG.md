@@ -19,7 +19,7 @@ change.
 ### Added
 
 - Repository scaffolded from the shared `library` template: composition-only GitLab CI
-  pinned to a tagged `open_ci_cd/templates`, branch-gated publish to the group PyPI
+  pinned to a tagged `@@CI_TEMPLATES_PROJECT@@`, branch-gated publish to the group PyPI
   registry, an enforced exported-symbol registry (`docs/contracts.md` + the test that fails
   when the two disagree), and the full doc set.
 - `Envelope`, `new_envelope` — the shared message envelope. See `docs/contracts.md`.

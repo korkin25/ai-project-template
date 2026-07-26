@@ -19,7 +19,7 @@ stay unique. The ``HelmRelease`` is already scoped by its namespace and does not
 
 Usage::
 
-    render.py clusters/laptop-local/environments/dev          # to stdout
+    render.py clusters/example-cluster/environments/dev        # to stdout
     render.py --out-dir rendered/ clusters/*/environments/*   # one file per environment
     render.py --all                                           # discover every environment
 """
