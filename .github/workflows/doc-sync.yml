@@ -38,8 +38,15 @@ jobs:
           changed=$(git diff --name-only "$base"...HEAD)
           echo "changed files:"; echo "$changed"
 
-          code=$(echo "$changed" | grep -E '^(src/|chart/|Dockerfile|docker-compose|\.github/workflows/)' || true)
-          docs=$(echo "$changed" | grep -E '^(docs/|README\.md|CHANGELOG\.md|TODO\.md|CLAUDE\.md)' || true)
+          # Code side = everything a reader of the docs could be misled about. `standard/`
+          # is in it because the standard IS the product here: a PR that rewrites the rules
+          # and leaves CLAUDE.md/CHANGELOG untouched used to sail through this gate. The
+          # patterns are ANCHORED (^), so templates/infra/README.md counts as code — it is a
+          # file this repo ships to other repos, not documentation of this repo.
+          code=$(echo "$changed" | grep -E '^(src/|chart/|helm/|deploy/|standard/|skills/|templates/|auto-tests/|Dockerfile|docker-compose|\.github/workflows/|\.gitlab-ci\.yml)' || true)
+          # Doc side includes AUTOPILOT-LOG.md: CLAUDE.md makes it mandatory for an
+          # autonomous change of any substance, so it is a legitimate doc for this gate.
+          docs=$(echo "$changed" | grep -E '^(docs/|README\.md|CHANGELOG\.md|TODO\.md|CLAUDE\.md|AUTOPILOT-LOG\.md)' || true)
 
           if [ -n "$code" ] && [ -z "$docs" ]; then
             echo "::error::Code/deploy files changed but no docs updated. Update the matching"

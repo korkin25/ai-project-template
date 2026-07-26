@@ -20,4 +20,18 @@ rules:
 
 ignore: |
   .venv/
-  chart/templates/
+  # Helm template directories: the files are Go templates, not YAML — `{{- if … }}` at the
+  # top of a file is a syntax error to any YAML parser, so linting them reports noise that
+  # can never be fixed and trains everyone to ignore this linter's output.
+  #
+  # BOTH paths are listed on purpose. This repository still keeps its own chart under
+  # `chart/`, while the service profile declares `helm/` canonical and the scaffolds in
+  # `templates/` use it — so an ignore written for one layout silently stops covering the
+  # other. That is exactly what happened: `templates/service/helm/templates/*.yaml` was
+  # linted as YAML and made `yamllint templates/` permanently red.
+  # Leading `**/` is load-bearing. yamllint matches with gitignore semantics, where a pattern
+  # containing a slash anywhere but the end is ANCHORED to the config's directory — so a bare
+  # `helm/templates/` covers only `./helm/templates/` and silently misses every scaffold under
+  # `templates/*/helm/templates/`. The unanchored form covers both.
+  **/chart/templates/
+  **/helm/templates/
