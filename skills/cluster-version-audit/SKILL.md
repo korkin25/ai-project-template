@@ -25,12 +25,26 @@ commands; let a human run them.
 
 ### 1. Collect the current state
 
+Run this **from the root of the repository that owns the pins** — the infra or platform repo
+whose manifests declare them — not from wherever this skill was installed. The version reader
+ships with that repo, at `scripts/check-versions.py` — the `infra` scaffold provides one, and
+any other repo holding pins is expected to provide its own at the same path. It reads Flux
+`HelmRepository` / `OCIRepository` / `HelmRelease` versions and in-manifest image tags out of
+the tree, so run anywhere else it reports an empty table, which reads identically to
+"everything is current".
+
 ```bash
 ./scripts/check-versions.py            # what is pinned vs what is newest
 ./scripts/check-versions.py --json     # keep this: it is the before-picture
 flux get kustomizations                # everything must be Ready BEFORE you plan an upgrade
 kubectl get nodes -o wide
 ```
+
+**If that repo has no `scripts/check-versions.py`, do not skip the step and do not write one
+mid-audit.** Collect the same picture by hand — the pins from the manifests, then
+`helm show chart <oci-url>` and `helm search repo <repo>/<chart>` for what is newest — and say
+in the report that the before-picture was assembled manually. An audit whose first step was
+quietly skipped is indistinguishable from one whose first step found nothing.
 
 If anything is already NotReady, say so **first and prominently**, then carry on with the
 audit. A pre-existing failure changes what the plan is worth — upgrading on top of a broken
@@ -117,4 +131,7 @@ everything you found in order to make it — including the parts that argue agai
 - **One component per change** when the plan is eventually executed. A batch upgrade that
   breaks tells you nothing about which part broke.
 - If the audit tool itself errors, fix the tool and re-run before reporting. A verifier
-  nobody checked is worse than no verifier, because it is believed.
+  nobody checked is worse than no verifier, because it is believed. A tool that is **absent**
+  is a different case: read the pins by hand and say so — do not write a version checker
+  during an audit, because a checker nobody has ever verified is exactly that believed
+  verifier, and it arrives wearing the authority of the report.

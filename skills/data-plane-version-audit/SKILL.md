@@ -32,10 +32,22 @@ window, every time.
 
 ### 1. Establish the before-picture
 
+Run this **from the root of the repository that owns the pins** — the infra or platform repo
+whose manifests declare them — not from wherever this skill was installed. The version reader
+ships with that repo, at `scripts/check-versions.py` — the `infra` scaffold provides one, and
+any other repo holding pins is expected to provide its own at the same path. It reads pins out
+of the manifest tree, so run anywhere else it writes an empty `before.json`, and an empty
+before-picture is worse than none: it gets attached to the log as evidence.
+
 ```bash
 ./scripts/check-versions.py --json > /tmp/before.json
 kubectl -n <ns> get cluster,helmrelease,statefulset,pvc
 ```
+
+**If that repo has no `scripts/check-versions.py`, do not skip the step and do not write one
+mid-audit.** Record the pins by hand into `/tmp/before.json`, and state in the report that it
+was assembled manually — the file is quoted later as the thing the after-picture is compared
+against, so how it was produced is part of what it means.
 
 Then capture what the numbers must still say afterwards — row counts, topic offsets,
 collection sizes. An upgrade that silently drops data looks identical to one that did not,
@@ -122,3 +134,6 @@ the user's call — and they can only make it against everything you found.
   see in order to disagree with it.
 - **Say the size.** "Rebuilding the index takes hours" is planning; "may take a while" is not.
 - **Report unknowns as unknown.** A version you could not resolve is a finding, not a blank.
+- **Never write the audit tool during the audit.** If the repo ships no version checker, read
+  the pins by hand and say so. A checker written under time pressure and never verified is
+  the worst kind of verifier: it is believed, and it arrives carrying the report's authority.
