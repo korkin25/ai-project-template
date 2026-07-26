@@ -9,7 +9,7 @@ extends: default
 
 ignore: |
   .venv/
-  .ansible/
+  rendered/
   .git/
 
 rules:
@@ -18,21 +18,21 @@ rules:
   line-length:
     max: 120
     level: warning
-  # Ansible and Kubernetes files both accept either; forcing one only produces churn.
+  # Kubernetes manifests are written both with and without it; forcing one produces churn.
   document-start: disable
   # Comment indentation trips over the block-scalar comments used throughout this repo.
   comments-indentation: disable
-  # THE IMPORTANT ONE. Unquoted yes/no/on/off are booleans in YAML 1.1 (which PyYAML, and
-  # therefore Ansible, still implements). `ansible_become: yes` is fine; a hostname or a
-  # version string that happens to read as `no` is not.
+  # THE IMPORTANT ONE. Unquoted yes/no/on/off are booleans in YAML 1.1, which many parsers
+  # still implement. A version string or a hostname that happens to read as `no` becomes
+  # `false`, and the object is admitted with a field nobody wrote.
   truthy:
     allowed-values: ["true", "false"]
     check-keys: false
-  # A duplicate key does not error in YAML — the last one silently wins. In a variables file
-  # that is a value someone believes they set and did not.
+  # A duplicate key does not error in YAML — the last one silently wins. In a values file
+  # that is a setting someone believes they made and did not.
   key-duplicates: enable
   octal-values:
-    # `mode: 0644` is an integer in YAML and Ansible needs a string; this catches the class
-    # of file-permission bugs where 0644 quietly becomes 420.
+    # `mode: 0644` is an integer in YAML; a chart or manifest expecting a string then gets
+    # 420. This catches that whole class of file-permission bug.
     forbid-implicit-octal: true
     forbid-explicit-octal: false

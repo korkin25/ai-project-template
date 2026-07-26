@@ -5,37 +5,35 @@
 # THIS PIPELINE LINTS AND VALIDATES. IT NEVER APPLIES ANYTHING.
 # ############################################################################
 #
-# No `ansible-playbook` without --check, no `kubectl apply`, no `helm upgrade`, no `flux
-# reconcile`. Not "not yet" — never. The reasoning, so nobody re-derives it wrongly:
+# No `kubectl apply`, no `helm upgrade`, no `flux reconcile`. Not "not yet" — never. The
+# reasoning, so nobody re-derives it wrongly:
 #
-#   * A pipeline that can apply must HOLD cluster-admin (or root-over-SSH) credentials. Every
-#     job in it, including a third-party linter with a compromised release, then runs with
-#     those credentials. That standing risk is far larger than the manual step it saves.
+#   * A pipeline that can apply must HOLD cluster-admin credentials. Every job in it,
+#     including a third-party linter with a compromised release, then runs with those
+#     credentials. That standing risk is far larger than the manual step it saves.
 #   * Infra changes are the least reversible in the platform: a bad CNI change costs the
 #     cluster, a bad runner change costs CI itself — including the pipeline you would need in
 #     order to fix it.
-#   * "Applying to a cluster always requires explicit human approval, every time" (the infra
-#     profile). Approval to apply once is never approval to apply again, and a pipeline
-#     cannot represent per-run approval.
+#   * It would defeat the point. The reconciler applies from git, so a pipeline that also
+#     applies creates a second writer and two sources of truth.
 #
-# The human workflow this pipeline supports instead: CI proves the change is well-formed, a
-# human runs the plan (`--check --diff`, `helm template`, `flux diff`), reads it, and applies
-# from a workstation. `docs/runbook.md` documents each of those commands.
+# The workflow this pipeline supports instead: CI proves the change is well-formed and renders
+# to valid Kubernetes objects; a human reads the diff (`flux build`, `flux diff`,
+# `kubectl diff`) and merges. Merging is the apply. `docs/runbook.md` documents each command.
 include:
-  - project: "open_ci_cd/templates"
+  - project: "@@CI_TEMPLATES_PROJECT@@"
     # WHAT THIS REF COSTS YOU.
     # These templates are executed code from another repository: whatever `ref` points at
-    # runs with this project's CI_JOB_TOKEN, its registry credentials and its signing key.
-    # A tag makes builds reproducible and turns a template upgrade into a reviewed, per-repo
-    # act. A moving branch does the opposite — one upstream commit changes every repo's
-    # pipeline at once, with no MR and no way to reproduce yesterday's build.
+    # runs with this project's CI_JOB_TOKEN and its credentials. A tag makes pipelines
+    # reproducible and turns a template upgrade into a reviewed, per-repo act. A moving
+    # branch does the opposite — one upstream commit changes every repo's pipeline at once,
+    # with no MR and no way to reproduce yesterday's run.
     #
-    # This platform tracks `main` by DELIBERATE CHOICE: the templates repo has no usable
-    # tag (its only tag trails main by hundreds of commits and is missing five of the eight
-    # files included below, so pinning to it breaks every pipeline). Same-day access to
-    # template fixes is worth more than reproducibility at this stage. Revisit when that
-    # repo starts cutting real releases — and before "fixing" this to a tag, check that the
-    # tag actually contains every file in the list.
+    # Prefer a tag. Tracking a branch is a legitimate choice when the templates repo cuts no
+    # releases and same-day access to fixes matters more than reproducibility — but only as a
+    # decision recorded in docs/architecture.md with its blast radius stated, never as
+    # something nobody got around to. Before switching to a tag, check the tag actually
+    # contains every file included below; a tag trailing the branch is worse than the branch.
     ref: "@@CI_TEMPLATES_REF@@"
     file:
       - "/globals.yml"   # stages, runner-tag anchors, tool image pins
@@ -48,11 +46,6 @@ include:
 #                            git commit is already its identifier.
 #   /docker-build.yml, /helm-package.yml, /functional.yml, /commit_changes.yml
 #                            no image, no chart, no artifact to commit back.
-#   /ansible.yml             it ships DEPLOY jobs (see the banner above). Its lint job is
-#                            reproduced below without them. If it is ever adopted, note that
-#                            it expects roles/requirements.yml and collections/requirements.yml
-#                            at the repository root — which is why this scaffold puts them
-#                            there — and its deploy jobs must stay disabled.
 
 variables:
   # checkov and gitleaks are the two scanners that earn their keep in an infra repo: one
@@ -60,42 +53,39 @@ variables:
   # committed "just for a minute".
   SAST_DISABLED: "false"
 
-  ANSIBLE_ROLE_REQUIREMENTS: "roles/requirements.yml"
-  ANSIBLE_COLLECTION_REQUIREMENTS: "collections/requirements.yml"
-
 # ---------------------------------------------------------------------------------------
 # Runner tags — READ THIS BEFORE "CLEANING UP" THE TWO BLOCKS BELOW
 # ---------------------------------------------------------------------------------------
 # globals.yml tags jobs through two anchors, `.default_runner` and `.default_runner_infra`,
-# whose value comes from ${RUNNER_TAG} / ${RUNNER_TAG_INFRA} (default:
-# `saas-linux-small-amd64`, GitLab.com's shared SaaS runners). Overriding them here retargets
-# every job that EXTENDS them — which, in this pipeline, is every job: the SAST jobs extend
-# `.default_runner_infra`, and the two jobs below extend `.default_runner_infra` explicitly.
+# whose value comes from ${RUNNER_TAG} / ${RUNNER_TAG_INFRA} (default: the platform's hosted
+# runners). Overriding them here retargets every job that EXTENDS them — which, in this
+# pipeline, is every job: the SAST jobs extend `.default_runner_infra`, and the two jobs below
+# extend it explicitly.
 #
 # The service template additionally overrides two jobs BY NAME — `get_unique_semversion`
-# (auto-semversioning.yml) and `SBOM-cyclonedx-image` (docker-build.yml) — because those
-# carry no tags at all and would otherwise escape to the SaaS shared runners. Those blocks
-# are deliberately ABSENT here: neither template is included, so neither job exists, and
-# naming a non-existent job would CREATE one — a job with `tags` and no `script`, which fails
-# the entire config with "jobs:<name> config should implement a script: or trigger: keyword".
-# If this repo ever includes either template, add the matching override at the same time.
+# (auto-semversioning.yml) and `SBOM-cyclonedx-image` (docker-build.yml) — because those carry
+# no tags at all and would otherwise escape to the hosted shared runners. Those blocks are
+# deliberately ABSENT here: neither template is included, so neither job exists, and naming a
+# non-existent job would CREATE one — a job with `tags` and no `script`, which fails the entire
+# config with "jobs:<name> config should implement a script: or trigger: keyword". If this repo
+# ever includes either template, add the matching override at the same time.
 #
 # The tag must be a LITERAL: GitLab expands variables in `tags` but not nested references
-# (gitlab-org/gitlab#407129). `job-agent-local` is the group's self-hosted runner — which
-# THIS repo registers. Chicken-and-egg is real here: before that runner exists, point these
-# at a SaaS tag, bootstrap the runner by hand following docs/runbook.md, then switch back.
+# (gitlab-org/gitlab#407129). Chicken-and-egg is real here — this repo deploys the runner its
+# own pipeline is tagged for. Before that runner exists, point these at a hosted tag,
+# bootstrap following docs/runbook.md, then switch back.
 .default_runner:
   tags:
-    - job-agent-local
+    - "@@RUNNER_TAG@@"
 
 .default_runner_infra:
   tags:
-    - job-agent-local
+    - "@@RUNNER_TAG@@"
 
 # ---------------------------------------------------------------------------------------
-# Lint the provisioning code
+# Lint the GitOps tree
 # ---------------------------------------------------------------------------------------
-lint_provisioning:
+lint_gitops:
   stage: validate
   extends:
     - .default_runner_infra
@@ -104,51 +94,62 @@ lint_provisioning:
   rules:
     - if: $NO_LINT_CHECKS == "true"
       when: never
-    # `exists:` so the job is not created at all in a repo half of whose provisioning is
-    # still a plan. A job that always passes because it found nothing to check is worse than
-    # a missing job: it looks like coverage.
+    # `exists:` so the job is not created at all in a repo whose tree is still a plan. A job
+    # that always passes because it found nothing to check is worse than a missing job: it
+    # looks like coverage.
     - exists:
-        - ansible.cfg
-        - playbooks/*.yml
+        - clusters/**/kustomization.yml
+        - clusters/**/kustomization.yaml
       when: always
   script:
     - |
       set -euo pipefail
 
-      # The bundle image normally ships these; installing them on demand keeps the job
-      # working if the image is ever slimmed, instead of failing with "command not found"
-      # in a repo whose pipeline is the only thing standing between a typo and the cluster.
-      for tool in yamllint ansible-lint; do
-        if ! command -v "${tool}" >/dev/null 2>&1; then
-          echo "INFO: ${tool} not present in ${IAC_BUNDLE_IMAGE} — installing it"
-          python3 -m pip install --quiet --disable-pip-version-check "${tool}"
-        fi
-      done
+      # The bundle image normally ships these; installing on demand keeps the job working if
+      # the image is ever slimmed, instead of failing with "command not found" in a repo whose
+      # pipeline is the only thing standing between a typo and the cluster.
+      if ! command -v yamllint >/dev/null 2>&1; then
+        echo "INFO: yamllint not present in ${IAC_BUNDLE_IMAGE} — installing it"
+        python3 -m pip install --quiet --disable-pip-version-check yamllint
+      fi
 
       echo "== yamllint =="
-      # Config in .yamllint; it is intentionally lenient about line length and strict about
-      # the things that silently change MEANING in YAML (duplicate keys, tab indentation,
-      # unquoted "yes"/"no" that Ansible reads as booleans).
+      # Config in .yamllint; intentionally lenient about line length and strict about the
+      # things that silently change MEANING in YAML — duplicate keys and tab indentation.
       yamllint .
 
-      echo "== ansible-lint =="
-      # ansible-lint enforces the two properties this repo lives by and a human review
-      # rarely catches: idempotence (no bare `command`/`shell` without a guard) and pinned
-      # versions. Both are non-negotiables in the infra profile.
-      ansible-lint --exclude .ansible --exclude .venv
-
-      echo "== playbook syntax check =="
-      # --syntax-check parses and resolves every playbook, role and include WITHOUT
-      # connecting to a host. It is the closest thing to "does this compile" that Ansible
-      # has, and it catches the undefined role or mistyped module that would otherwise be
-      # discovered halfway through an apply — i.e. with the cluster in a half-changed state.
-      for playbook in playbooks/*.yml; do
-        [ -e "${playbook}" ] || continue
-        echo "-- ${playbook}"
-        ansible-playbook --syntax-check "${playbook}"
+      echo "== render every sync root =="
+      # Rendering is this repo's equivalent of "does it compile". It resolves every overlay,
+      # patch and remote base WITHOUT touching a cluster, and catches the missing resource or
+      # mistyped patch target that would otherwise surface mid-reconcile, with the cluster
+      # already half-changed.
+      #
+      # `flux build` is preferred because it renders exactly what the controller would; plain
+      # `kustomize build` is the fallback when the CLI is absent from the image.
+      rendered=0
+      for root in clusters/*/; do
+        [ -d "${root}" ] || continue
+        echo "-- ${root}"
+        if command -v flux >/dev/null 2>&1; then
+          flux build kustomization "$(basename "${root}")" --path "${root}" --dry-run
+        elif command -v kustomize >/dev/null 2>&1; then
+          kustomize build "${root}" >/dev/null
+        else
+          echo "ERROR: neither flux nor kustomize is available in ${IAC_BUNDLE_IMAGE}"
+          echo "ERROR: the tree cannot be rendered, so this job would pass without checking anything"
+          exit 1
+        fi
+        rendered=$((rendered + 1))
       done
 
-      echo "OK: provisioning code is well-formed. It has NOT been applied — that is a human step."
+      if [ "${rendered}" -eq 0 ]; then
+        # rules:exists matched, yet nothing rendered — the layout disagrees with what this job
+        # looks for. Failing loudly beats a green job that verified nothing.
+        echo "ERROR: no sync root rendered under clusters/ — check the layout against README.md"
+        exit 1
+      fi
+
+      echo "OK: ${rendered} sync root(s) render cleanly. Nothing was applied — the reconciler does that."
 
 # ---------------------------------------------------------------------------------------
 # Validate the raw Kubernetes manifests
@@ -183,8 +184,8 @@ validate_manifests:
       else
         echo "WARN: kubeconform not available in ${IAC_BUNDLE_IMAGE} — falling back to a structural check"
         # A deliberately small fallback rather than a skip: an unparseable or nameless
-        # manifest must never reach the human who is about to apply it by hand. Add
-        # kubeconform to the bundle image to upgrade this to real schema validation.
+        # manifest must never reach the cluster. Add kubeconform to the bundle image to
+        # upgrade this to real schema validation.
         python3 - <<'PY'
       import pathlib
       import sys

@@ -13,11 +13,6 @@ repos:
       - id: yamllint
         args: ["-c", ".yamllint"]
 
-  - repo: https://github.com/ansible/ansible-lint
-    rev: "v25.9.2"
-    hooks:
-      - id: ansible-lint
-
   - repo: https://github.com/bridgecrewio/checkov
     rev: "3.3.8"
     hooks:

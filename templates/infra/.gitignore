@@ -16,12 +16,10 @@ secrets.*
 vault-token
 *.retry
 
-# Ansible working state (collections and roles are downloaded, never vendored — they are
-# pinned in requirements.yml instead, which is the reviewable form).
-.ansible/
-collections/ansible_collections/
-roles/*/
-!roles/README.md
+# Rendered output. Never committed: the tree is the source, the render is derived, and a
+# stale committed render is a lie that reviews well.
+rendered/
+*.rendered.yaml
 .venv/
 venv/
 __pycache__/
