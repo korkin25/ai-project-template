@@ -36,6 +36,39 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **`Changing the rules — the standard is upstream`** — a new rule goes into `standard/` first
   and propagates down, never into a generated `CLAUDE.md`; propagation is part of the change;
   and this repository is the first consumer of every rule it publishes.
+- **`Status is half the record`** — a status is updated in the change that changes the
+  reality, not in a later sweep. A logged task nobody re-touches produces a file that looks
+  authoritative and is wrong, and the failure is specific: the work finishes, the code and the
+  changelog are perfect, and every ticket still reads `⬜`, so the next session re-derives what
+  was already done or redoes it.
+
+### Fixed
+
+- **The three advertised enforcement mechanisms now exist** (`PRJ-2`). `standard-drift`
+  regenerates `CLAUDE.md` and fails on any difference, distinguishing a drifted file from a
+  broken `repo.env` because the fix differs. `doc-sync` gained the GitLab half it never had,
+  and its code regex — which missed `standard/`, so a change rewriting the entire rulebook
+  passed the gate untouched — now covers the real surface on both hosts, byte-identically.
+  Both gates also ship in the `service`, `library` and `infra` scaffolds, so a spawned repo
+  gets the enforcement its generated `CLAUDE.md` promises.
+- **`docs/contracts.md`** (`PRJ-3`) — required by the context map, the doc-sync table and
+  lifecycle step 4, and absent from the repo that mandates it.
+- **The version-audit skills are runnable** (`PRJ-4`). Both opened with
+  `./scripts/check-versions.py`, which does not exist here. A root copy was rejected on
+  evidence rather than added: run against this repo the ported reader returns one row, a
+  documented placeholder, while seeing none of the real pins — which already have an owner in
+  `dependabot.yml`. The skills now state the per-repo convention and carry a manual fallback.
+- **The `infra` profile is a GitOps tree, not an Ansible repo** (`PRJ-11`), structurally and
+  in every line of its prose.
+- **No project-specific names left in the standard or the scaffolds** (`PRJ-12`, `PRJ-14`).
+  The host-agnostic rewrite also reverted an earlier mistake: "GitLab is the only platform a
+  repo is required to support" is a project decision that had leaked upstream.
+
+### Bookkeeping
+
+- `PRJ-13` was a duplicate of `PRJ-8` (observability), created by logging the same requirement
+  twice under two ids. Both are closed by the same change; `PRJ-8` is the surviving reference.
+  Recorded rather than quietly deleted, because the ids are documented as never reused.
 
 ### Changed
 

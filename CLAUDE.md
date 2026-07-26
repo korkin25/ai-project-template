@@ -1,7 +1,7 @@
 <!-- GENERATED FILE — DO NOT EDIT.
      Sources : standard/base.md + standard/profiles/service.md + standard/repo.env
      Profile : service
-     Sources-SHA256: 5d7d8cfa0ccf7e00c2631b2756df76e760cdc5fcc555c9ed20ca7ea8b3a005d9
+     Sources-SHA256: 38065d58d984d3283826f3fe8fb4f81f64511077fc45cfc4575fcd6bbdcc44cf
      Regenerate: ./standard/compose.sh
      Edit the sources, never this file. CI fails a change where the two disagree.
 -->
@@ -125,6 +125,7 @@ Keep docs in lockstep with the code, **in the same change** — never wait to be
 | **Anything another repo consumes** (topic, table, endpoint, event schema, exported symbol) | `docs/contracts.md` + the platform repo — see *Cross-repo contracts* |
 | A new/changed runtime env var | `docs/configuration.md` |
 | A feature is picked up for implementation | its test section in `docs/tests.md` |
+| A new/changed metric, log field or alert threshold | `docs/observability.md` + the dashboard — see *Observability* |
 | Any user-visible change | `CHANGELOG.md` under `## [Unreleased]` |
 | Task started / finished / blocked, or a test's pass status | `TODO.md` |
 | An autonomous change of any substance | `AUTOPILOT-LOG.md` — see *Autopilot log* |
@@ -162,6 +163,33 @@ three.
 
 The test for whether this is being followed: after any conversation, everything the user
 asked for is findable in a file. If it is only in the chat, it is already lost.
+
+### Status is half the record — keep it current
+
+Logging a task and then never touching its row again produces a file that is worse than an
+empty one: it looks authoritative and is wrong. A reader cannot tell finished work from
+abandoned work, and the "Current state / next action" block — the whole point of which is to
+let a cold session start without archaeology — quietly becomes fiction.
+
+**Update the status in the same change that changes the reality.** Not at the end of the day,
+not when the batch is done:
+
+- Starting → `🟡`, in the change that starts it. A `⬜` row someone is halfway through is how
+  two people do the same work.
+- Blocked → say so **in the row**, naming what it is blocked on and who can unblock it. A
+  blocker living only in a chat message is a blocker nobody will find.
+- Done **and verified** → move the row to `CHANGELOG.md`. Not marked `✅` and left in place:
+  `TODO.md` is open work, never a history, and a file where done and open rows sit together
+  stops being scannable at about twenty rows.
+- Abandoned or superseded → delete the row and say why in the entry that supersedes it.
+  Silently leaving it is indistinguishable from forgetting.
+
+The failure this prevents is specific and common: a batch of work finishes, the code and the
+`CHANGELOG` are perfect, and every ticket still reads `⬜`. The next session — or the next
+agent — re-derives what was already done, or worse, redoes it.
+
+**"Verified" means the check ran and passed**, not that the change looks right. If the
+verification could not be run, the row stays open and says why.
 
 ## Multi-repo — this repo is one of many
 
@@ -372,6 +400,41 @@ verifier nobody checked is worse than no verifier, because it is believed.
 - Promoting a version into a shared environment additionally requires tier-(d) green in the
   platform repo for that environment.
 
+## Observability — a feature is not done until you can see it
+
+Tests prove a feature worked on the machine that ran them. Observability is how you know it
+is working *now*, in the environment where it matters, for the users it matters to. A feature
+that ships without it is not finished; it is finished-looking.
+
+**This is part of the definition of done, in the same change as the code.** Not a follow-up
+ticket, not "once it stabilises". The follow-up never comes, and the moment you actually need
+the metric is the moment you cannot add it — production is misbehaving and you are blind.
+
+### What every feature ships with
+
+| | What it means, concretely |
+|---|---|
+| **Metrics for its own behaviour** | Not just request rate, errors and duration on the endpoint — those tell you the service is up, not that the *feature* is right. Emit the counters and histograms that make this feature diagnosable: how many items it processed, how many it rejected and why, how long its slow step took, how deep its queue is. The test: when this feature misbehaves at 3am, does a metric change? |
+| **Structured logging, one schema** | JSON, with the same field names across every service — and that schema comes from the **shared library**, so no service invents its own. Two services calling the same field `job_id` and `jobId` is a query nobody can write. |
+| **Fields as structured metadata** | Every field is a queryable label on the log entry, **never** packed into the message string. A value you have to extract with a regex at query time is not queryable — it is a hope. This is what makes a log store searchable rather than merely full. |
+| **The dashboard, in the same change** | A metric with no panel is a metric nobody looks at. Prefer generating panels from the metric definitions over drawing them by hand: a hand-drawn dashboard is the first artefact to rot, because nothing fails when it goes stale. Dashboards that span services live in the platform repo, versioned with the environment. |
+| **`docs/observability.md`** | For each metric: what it means, what value is bad, and what to do about it. A metric whose healthy range nobody wrote down cannot be alerted on — the alert threshold becomes a guess, and a guessed threshold is either ignored or paged on nightly. |
+
+### Rules that follow
+
+- **No secrets, no personal data in logs or labels.** Redact at the source, not in the query.
+- **Label cardinality is a budget, not a free variable.** A label with unbounded values — a user
+  id, a URL, a raw error string — multiplies series until the metrics backend degrades. Bucket
+  it, or make it a log field instead of a metric label.
+- **Every alert names an owner and an action.** An alert that fires with nothing to do trains
+  everyone to ignore the channel, which costs more than the alert was ever worth.
+- **A metrics backend and a log backend are hard requirements**, declared in the platform's
+  `requirements.yaml` like any other capability. A service that emits metrics into a cluster
+  with nowhere to store them is doing arithmetic in private.
+
+The retrofit is real work: a service that has been running without any of this needs it added,
+and that is a ticket like any other. What it is not is optional.
+
 ## Versioning & releasing (auto-generated — never hardcode)
 
 **One source of truth: GitVersion** (`GitVersion.yml`). It computes the SemVer for
@@ -440,14 +503,21 @@ This project is developed by an AI agent under continuous, autonomous iteration.
    *Cross-repo contracts* protocol **before** writing code.
 5. **Test plan.** Add the feature's section to `docs/tests.md` (tiers a/b/c/d) — the tests
    derive from the design.
-6. **Branch.** Create `feature/PRJ-<n>-<slug>` off `dev`.
-7. **TDD.** Write the failing tier-(a) test(s) first; implement until green; commit in small
-   logical units on the branch and push after each.
-8. **Verify.** Tier-(a) green in CI (analyze the run logs even when green); run tier-(b) in
-   dev/sandbox; update each test's status in `TODO.md`.
-9. **Record.** When done and the suite is green, move the item from `TODO.md` to
-   `CHANGELOG.md`, and add an `AUTOPILOT-LOG.md` entry if the work was autonomous.
-10. **MR.** Open an MR to `dev`; merge with `--no-ff` only when CI is green, then push `dev`.
+6. **Observability plan.** Decide, before writing code, which metrics and log fields make this
+   feature diagnosable, and record them in `docs/observability.md` with what a bad value looks
+   like. Deciding this afterwards produces the metrics that were easy to emit rather than the
+   ones you needed.
+7. **Branch.** Create `feature/PRJ-<n>-<slug>` off `dev`.
+8. **TDD.** Write the failing tier-(a) test(s) first; implement until green; commit in small
+   logical units on the branch and push after each. The metrics and log fields from step 6
+   are part of the implementation, not a later pass.
+9. **Verify.** Tier-(a) green in CI (analyze the run logs even when green); run tier-(b) in
+   dev/sandbox; update each test's status in `TODO.md`. Confirm the new metrics actually
+   appear and the new log fields are queryable — an emitter nobody checked is indistinguishable
+   from one that silently emits nothing.
+10. **Record.** When done and the suite is green, move the item from `TODO.md` to
+    `CHANGELOG.md`, and add an `AUTOPILOT-LOG.md` entry if the work was autonomous.
+11. **MR.** Open an MR to `dev`; merge with `--no-ff` only when CI is green, then push `dev`.
     Promoting `dev` → `rc` → `release` is a separate, approval-gated step.
 
 ## Safe autonomy (automate development, safely)
@@ -667,7 +737,14 @@ depend on them:
   dedicated uid/gid; the chart sets `runAsNonRoot`, `readOnlyRootFilesystem`,
   `allowPrivilegeEscalation: false`, drops all capabilities, and mounts an `emptyDir` at
   `/tmp` for anything that must write.
-- **Logs go to stdout**, structured, with no secrets in them.
+- **Exposes `GET /metrics`** in Prometheus text format, and the chart ships a `ServiceMonitor`
+  (or the equivalent scrape config) that is enabled wherever a metrics backend exists. A chart
+  that templates a `ServiceMonitor` against an endpoint the service does not serve is a
+  scrape target that fails silently — the panels stay empty and nobody is told why.
+- **Logs go to stdout**, one JSON object per line, using the shared library's schema so field
+  names are identical across services. No secrets, no personal data. Every value that anyone
+  would filter by is its own field, never interpolated into the message text — see
+  *Observability*.
 - **Shutdown is graceful**: SIGTERM stops intake, finishes in-flight work, commits offsets,
   exits non-zero only on real failure.
 - **Message handling is idempotent and commits after success**, never before. Auto-commit on
