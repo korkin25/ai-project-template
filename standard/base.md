@@ -222,6 +222,36 @@ The *Safe autonomy* rules below apply per repo. Across repos, additionally:
 - A **frozen** repo (one marked read-only in the platform docs) is never modified, for any
   reason, without an explicit instruction naming it.
 
+### Keeping deployed versions current
+
+Pinned versions are what make an environment reproducible. They are also what make it
+quietly age, until an upgrade stops being a step and becomes a project. The counterweight is
+a **monthly audit** — not an upgrade, an audit:
+
+1. Run the version check for the repo (`scripts/check-versions.py`), and keep its JSON as the
+   before-picture.
+2. Read the changelog of everything that moved. The distance in SemVer says how carefully,
+   not whether.
+3. Write an upgrade plan: risk, order, verification command, and rollback. **A component
+   whose rollback cannot be described does not go in the plan** — that is a decision for a
+   human with a maintenance window, not a monthly routine.
+4. Record it, and hand it over. The audit never applies anything.
+
+Two skills implement this, deliberately separate because the question differs:
+
+| Skill | Scope | The question it answers |
+|---|---|---|
+| `cluster-version-audit` | CNI, cert-manager, secrets operator, secret store, GitOps controller, CRDs, operators | will the **cluster** survive this |
+| `data-plane-version-audit` | database, message bus, vector store, cache, CDC | will the **data** survive this, and can I get back |
+
+The split is not cosmetic. For the substrate the order is CRDs, then operator, then workloads,
+and a rollback is a chart version. For stateful components the backup comes **first**, the
+upgrade is frequently one-way — a rewritten data directory, a bumped log format, a rebuilt
+index — and "roll back the version" restores the binary while leaving the data behind.
+
+Two things that stay true of both: an upgrade nobody can undo is not a routine change, and a
+verifier nobody checked is worse than no verifier, because it is believed.
+
 ## Testing policy (apply without being asked)
 
 **Four test tiers:**
