@@ -1,7 +1,7 @@
 <!-- GENERATED FILE — DO NOT EDIT.
      Sources : standard/base.md + standard/profiles/service.md + standard/repo.env
      Profile : service
-     Sources-SHA256: dbb803338b05e0643f698f6cea41fd8d3d8f84fcfd7442f25288bdbcd2800ea4
+     Sources-SHA256: 15f07eea2882f4d1b4f5c15d8ff38daf8229e030572fce79a0e9e5cfb6660b3c
      Regenerate: ./standard/compose.sh
      Edit the sources, never this file. CI fails a change where the two disagree.
 -->
@@ -239,10 +239,11 @@ a **monthly audit** — not an upgrade, an audit:
    before-picture.
 2. Read the changelog of everything that moved. The distance in SemVer says how carefully,
    not whether.
-3. Write an upgrade plan: risk, order, verification command, and rollback. **A component
-   whose rollback cannot be described does not go in the plan** — that is a decision for a
-   human with a maintenance window, not a monthly routine.
-4. Record it, and hand it over. The audit never applies anything.
+3. Write an upgrade plan covering **every** component that moved: risk, order, verification
+   command, rollback, and a separately-marked recommendation. A rollback that cannot be
+   described is written down as absent — that is a finding, never a reason to omit the entry.
+4. Record it, and hand it over. The audit never applies anything, and never decides anything:
+   it produces the complete analysis, and the person reading it chooses.
 
 Two skills implement this, deliberately separate because the question differs:
 

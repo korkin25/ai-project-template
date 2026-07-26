@@ -232,10 +232,11 @@ a **monthly audit** — not an upgrade, an audit:
    before-picture.
 2. Read the changelog of everything that moved. The distance in SemVer says how carefully,
    not whether.
-3. Write an upgrade plan: risk, order, verification command, and rollback. **A component
-   whose rollback cannot be described does not go in the plan** — that is a decision for a
-   human with a maintenance window, not a monthly routine.
-4. Record it, and hand it over. The audit never applies anything.
+3. Write an upgrade plan covering **every** component that moved: risk, order, verification
+   command, rollback, and a separately-marked recommendation. A rollback that cannot be
+   described is written down as absent — that is a finding, never a reason to omit the entry.
+4. Record it, and hand it over. The audit never applies anything, and never decides anything:
+   it produces the complete analysis, and the person reading it chooses.
 
 Two skills implement this, deliberately separate because the question differs:
 

@@ -49,9 +49,11 @@ For every component holding state, answer with a command and its real output:
 - Has a restore from it ever been performed? If never, the backup is a belief.
 - How long does the restore take? That number is the length of the maintenance window.
 
-If a component has no exercised restore path, **that is the finding**. Report it and stop
-planning its upgrade — a first restore attempted under pressure, after a failed upgrade, is
-the worst possible time to discover the backup was incomplete.
+If a component has no exercised restore path, **that is one of the most valuable lines in the
+report** — state it plainly and keep analysing that component anyway. A first restore
+attempted under pressure, after a failed upgrade, is the worst possible time to discover the
+backup was incomplete; that is an argument for saying so loudly, not for leaving the
+component out. The user decides what to do with the risk; your job is that they can see it.
 
 ### 3. Classify by data risk, not by SemVer distance
 
@@ -84,7 +86,10 @@ the worst possible time to discover the backup was incomplete.
   procedure:   the operator's documented steps, in order — not "bump the tag"
   verify:      the data assertions from step 1, re-run
   rollback:    what actually restores service, and whether it costs the data written since
-               the backup. If the answer is "restore and lose N minutes", say N.
+               the backup. If the answer is "restore and lose N minutes", say N. If there is
+               no path back, write `NONE FOUND` and what you checked — an absent rollback is
+               a finding to surface, never a reason to drop the entry.
+  recommendation: what you would do, marked as advice. The decision is the user's.
 ```
 
 Sequence across components matters: upgrade the **producer side before the consumer** where a
@@ -95,10 +100,14 @@ if the slots break you want to know which change did it.
 
 Record the plan, add an `AUTOPILOT-LOG.md` entry with `/tmp/before.json` attached, and report:
 
-- what is behind, ordered by data risk rather than by version distance;
-- which upgrades are safe to batch and which need a window of their own;
-- **explicitly, which components have no exercised restore path** — that is usually the most
-  valuable line in the report and the one most likely to be skipped.
+- **every** component that moved, in full — ordered by data risk rather than by version
+  distance, but never trimmed to the ones you would act on;
+- which upgrades could be batched and which want a window of their own, as advice;
+- **explicitly, which components have no exercised restore path** — usually the most valuable
+  line in the report and the one most likely to be skipped.
+
+Hand over the complete analysis. Deciding what to upgrade, and what risk is acceptable, is
+the user's call — and they can only make it against everything you found.
 
 ## Guardrails
 
@@ -108,5 +117,8 @@ Record the plan, add an `AUTOPILOT-LOG.md` entry with `/tmp/before.json` attache
   known destination and a known retention, not a step buried inside a read-only check.
 - **A major version of a stateful component is never "just a bump".** If a plan for one reads
   like a tag change, the operator's documentation has not been read.
+- **Never filter the report.** Rank and annotate; omit nothing. A component you judged too
+  risky to touch still gets its full entry — that judgement is exactly what the user needs to
+  see in order to disagree with it.
 - **Say the size.** "Rebuilding the index takes hours" is planning; "may take a while" is not.
 - **Report unknowns as unknown.** A version you could not resolve is a finding, not a blank.

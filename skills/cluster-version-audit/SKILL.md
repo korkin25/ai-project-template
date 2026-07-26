@@ -32,8 +32,10 @@ flux get kustomizations                # everything must be Ready BEFORE you pla
 kubectl get nodes -o wide
 ```
 
-If anything is already NotReady, **stop and report that instead**. Upgrading on top of a
-broken reconciliation means you will not know which failure you caused.
+If anything is already NotReady, say so **first and prominently**, then carry on with the
+audit. A pre-existing failure changes what the plan is worth — upgrading on top of a broken
+reconciliation means you will not know which failure you caused — but it is a caveat to state,
+not a reason to withhold the version analysis the user asked for.
 
 ### 2. Classify each gap by what it can break, not by SemVer
 
@@ -79,19 +81,27 @@ One entry per component, ordered so nothing upgrades before its dependency:
   rollback:  how to get back, and whether the old version can still read the new state
 ```
 
-**A component whose rollback you cannot describe does not go in the plan.** That is the whole
-gate: an irreversible upgrade to the substrate is a decision for a human with a maintenance
-window, not a monthly routine.
+**Report every component, including the ones you would not upgrade.** A rollback you cannot
+describe is a *finding*, written into the entry as `rollback: NONE FOUND` with what you
+checked — never a reason to leave the row out. Withholding a row makes the decision instead
+of informing it, and the person deciding cannot see what they were not shown.
+
+Add a separate `recommendation:` line saying what you would do and why. It is advice sitting
+next to the evidence, not a filter applied before it.
 
 ### 5. Hand it over
 
 Record the plan in the repository (`docs/` or the ticket), add an `AUTOPILOT-LOG.md` entry
 with the before-picture attached, and report to the user with:
 
-- how many components are behind, by risk not by count;
-- which ones you recommend doing now, which to defer, and why;
+- **every** component that moved, with its full entry — not a summary that drops the
+  awkward ones;
+- what you recommend and why, clearly marked as a recommendation;
 - anything you could **not** resolve — an unreachable source is a supply-chain problem worth
   raising on its own, not a blank cell in a table.
+
+The deliverable is the complete analysis. The decision is the user's, and they need
+everything you found in order to make it — including the parts that argue against acting.
 
 ## Guardrails
 
@@ -99,6 +109,8 @@ with the before-picture attached, and report to the user with:
   against a live cluster. The plan is the deliverable.
 - **Never bump a pin as a side effect of auditing.** Editing manifests is a separate,
   reviewed change.
+- **Never filter the report.** Rank, annotate and recommend freely; omit nothing. "I judged
+  this not worth mentioning" is the one output this skill must never produce.
 - **Report unknowns as unknown.** Container image tags cannot be ordered reliably across
   registries; say "not resolved" rather than guessing, because a guessed "latest" is how a
   downgrade gets recommended.
