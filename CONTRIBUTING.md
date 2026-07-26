@@ -8,7 +8,8 @@ agents alike.
 
 1. **Design before code.** No implementation until the design is written down and any
    architectural decision is agreed (see `docs/architecture.md`).
-2. **Log the task** in `TODO.md` as `PRJ-<n>` and add it to `Features.md`.
+2. **Log the task** in `TODO.md` as `PRJ-<n>`; if it is user-facing, describe it in
+   `README.md` `## Features` once built.
 3. **Branch** `feature/PRJ-<n>-<slug>` off `dev` (there is no `main`; the flow is
    `feature/*` → `dev` → `rc` → `release`).
 4. **TDD** — write the failing test first, then implement until green. No feature code

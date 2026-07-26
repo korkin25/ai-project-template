@@ -29,3 +29,11 @@ items use `PRJ-D<n>`.
 ## Open tasks
 
 _None — add rows as `| PRJ-<n> | ⬜ | <task> | <details> |`._
+
+## Planned / ideas
+
+Backlog for features not yet built and brainstorm ideas. A new request or idea from the user
+lands here first, then becomes a `PRJ-<n>` task above. Once a feature ships, describe it in
+[README.md](README.md) under `## Features`.
+
+- _None yet._

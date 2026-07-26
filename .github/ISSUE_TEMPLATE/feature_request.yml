@@ -13,7 +13,7 @@ body:
     id: proposal
     attributes:
       label: Proposed solution
-      description: What should it do? (This becomes a numbered entry in Features.md.)
+      description: What should it do? (This becomes a `## Features` entry in README once built.)
     validations:
       required: true
   - type: textarea

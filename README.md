@@ -13,7 +13,7 @@ or any Agent-Skills runtime) knows exactly how to work in the repo from `CLAUDE.
 | Area | Files |
 |------|-------|
 | **Rules (canonical)** | [`CLAUDE.md`](CLAUDE.md) — language, doc-sync, testing policy, build/CI, per-task lifecycle; [`AGENTS.md`](AGENTS.md) — pointer + Agent-Skills portability |
-| **Backlog & history** | [`Features.md`](Features.md) (numbered backlog), [`TODO.md`](TODO.md), [`CHANGELOG.md`](CHANGELOG.md) |
+| **Features & history** | [`## Features`](#features) (user-facing feature list — what this README renders on the Marketplace/PyPI page), [`TODO.md`](TODO.md) (open work + backlog/ideas), [`CHANGELOG.md`](CHANGELOG.md) |
 | **Docs** | [`docs/configuration.md`](docs/configuration.md) (env-var reference), [`docs/tests.md`](docs/tests.md) (per-feature test catalog) |
 | **Tests** | [`auto-tests/`](auto-tests/) — group-a (automated/CI) · group-b (dev-machine/sandbox) · group-c (human-in-the-loop) |
 | **CI (GitHub)** | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — **composition-only**: every job comes from the public reusable workflows in [`korkin25/open-ci-actions@v1`](https://github.com/korkin25/open-ci-actions) (detect → python / sast / docker → GHCR / helm / functional / release). The file is wiring + inputs; new shared jobs belong in open-ci-actions |
@@ -35,7 +35,7 @@ it with your real code.
    (`name`, `[project.scripts]`, `[tool.hatch.build.targets.wheel]`). The image/chart names
    are derived from the repo name automatically in CI — no edit needed.
 2. **Ticket scheme.** Pick a prefix (this template uses `PRJ-<n>`); set it in `CLAUDE.md`,
-   `TODO.md`, `Features.md`.
+   `TODO.md`.
 3. **Language.** `CLAUDE.md` sets repo content = English, live chat = your working language
    (default here: Russian). Change the chat language if needed.
 4. **Trim what you don't use.** No Telegram/voice? Drop `docker-compose.voice.yml` and the
@@ -64,3 +64,19 @@ task is "done" only when 100% tested. CI is the single release pipeline: it gate
 quality (radon/xenon) and security (bandit/pip-audit/semgrep/checkov/hadolint/trivy) and
 publishes the image + Helm chart to GHCR. The agent develops **continuously** and consults
 a human only on architectural decisions.
+
+## Features
+
+The user-facing feature list. The Marketplace/PyPI/OpenVSX pages render this README, so this
+section **is** the feature list your users see. List **only user-facing features** here — the
+scaffold/CI/tooling that ships with the template is not a product feature (its history lives in
+[`CHANGELOG.md`](CHANGELOG.md)); backlog and ideas not yet built live in [`TODO.md`](TODO.md).
+
+_Illustrative sample entries describing the sample app's behavior — replace them with your
+product's features:_
+
+- **Health check.** The service answers `GET /health` (also `/healthz` and `/`) with a `200`
+  JSON body `{"status": "ok", "version": …}`, so users and uptime monitors can confirm it is
+  live and see which version is running.
+- **Command-line interface.** An `app` command exposes `app --version` and `app serve`, which
+  starts the HTTP service on the configured host/port (`APP_HOST` / `APP_PORT`).

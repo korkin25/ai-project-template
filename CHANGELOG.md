@@ -9,6 +9,13 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- **Removed `Features.md` — features live in `README.md` `## Features`.** The user-facing
+  feature list now lives in `README.md` under `## Features` (the Marketplace/PyPI/OpenVSX pages
+  render the README, so that section is the feature list users see); backlog and not-yet-built
+  ideas live in `TODO.md`. `Features.md` was deleted and every reference to it purged from the
+  standard (`CLAUDE.md`, `.claude/settings.json`, `.cursor/rules/project.mdc`, PR/issue
+  templates, `doc-sync.yml`, `CONTRIBUTING.md`). The "only user-facing features" scope rule was
+  kept, now describing the README `## Features` section.
 - **GitHub Releases on stable.** `release.yml` now, on a `release`-branch build, tags `vX.Y.Z` and cuts a GitHub Release (auto-notes + built artifacts). Pre-releases (`rc`) publish to the registry only (no tag), so pre-release tags never confuse GitVersion; the version stays driven by `next-version`. Doctrine updated in CLAUDE.md.
 
 - **`Features.md` scoped to user-facing features only.** `CLAUDE.md` (Feature backlog) now
