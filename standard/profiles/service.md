@@ -29,7 +29,9 @@ docs/                   architecture.md, configuration.md, tests.md, contracts.m
 The pipeline is **composition, not inline jobs** — every job comes from the shared templates.
 **New shared CI logic belongs in the templates repo, never in this repo.**
 
-**GitLab** (`.gitlab-ci.yml`) includes, from `open_ci_cd/templates`:
+On **GitLab**, `.gitlab-ci.yml` includes these from the group's shared CI-templates repo. On
+**GitHub** the equivalents are reusable workflows; the job set and its guarantees are the
+same, and the table below is the contract either way.
 
 | Include | Gives |
 |---|---|
@@ -46,24 +48,39 @@ The pipeline is **composition, not inline jobs** — every job comes from the sh
 deliberate, per-repo act. A moving branch does the opposite: one upstream commit changes the
 pipeline in every repository at once, including the ones that were green a minute ago.
 
-This platform currently tracks `main` **by deliberate choice** — the templates repo has no
-usable tag (its only tag trails `main` by hundreds of commits and lacks most of the files
-included here), and same-day access to template fixes is worth more than reproducibility at
-this stage. Revisit once the templates repo starts cutting real releases. Do not "fix" this
-to a tag without checking that the tag actually contains every included file.
+**Prefer a tag. Tracking a branch is allowed, but only as a recorded decision** — written in
+`docs/architecture.md` with its blast radius stated plainly — never as something nobody got
+around to. It is a defensible trade-off when the templates repo cuts no releases and same-day
+access to fixes is worth more than reproducibility; it is indefensible when it happened by
+accident. Before switching an existing repo to a tag, check the tag actually contains every
+included file: a tag that trails the branch by a long way is worse than the branch.
 
 `docker-sign.yml` is **deprecated** — signing already happens inside `docker-build.yml`.
 Do not include it.
 
-**GitLab is the only platform a repo is required to support.** Images, charts and packages
-all live in the GitLab registries of the owning group; no repo needs a GitHub account, a
-GHCR path or a GitHub Actions workflow to be complete.
+### Choosing a host
 
-**GitHub is optional.** A repo that is *also* published to GitHub (the upstream standard
-template is) mirrors the same gates through
-[`korkin25/open-ci-actions@v1`](https://github.com/korkin25/open-ci-actions)
-(`detect` → `python` / `sast` / `docker` / `helm` / `functional`). Keep the two in parity or
-drop the GitHub half entirely — a half-maintained second pipeline is worse than none.
+**This standard is host-agnostic.** The gates, the artifacts and the release model are the
+same on GitLab and on GitHub; only the wiring differs. **A project picks one host, once, and
+records the choice in its own `docs/architecture.md`** — that is a project decision, never
+the standard's.
+
+| | GitLab | GitHub |
+|---|---|---|
+| Pipeline | `.gitlab-ci.yml`, composed from `include:` of a shared templates repo | `.github/workflows/ci.yml`, composed from `uses:` of a reusable-workflow repo |
+| Job set | `globals` · `auto-semversioning` · `lint` · `sast` · `docker-build` · `helm-package` · `functional` · `commit_changes` | `detect` → `python` / `sast` / `docker` / `helm` / `functional` |
+| Images | the group's container registry | the org's container registry |
+| Charts (OCI) | the same registry, under a charts path | the same registry, under a charts path |
+| Packages | the group's package registry | the language's public index, or the org's |
+| Review unit | merge request | pull request |
+| Ownership | `CODEOWNERS` + approval rules | `CODEOWNERS` + required reviewers |
+| Dependency bot | Renovate | Dependabot or Renovate |
+| Templates | `.gitlab/merge_request_templates/` | `.github/PULL_REQUEST_TEMPLATE.md` |
+
+**Support exactly one.** Publishing to both is allowed only when someone owns keeping them in
+parity: a half-maintained second pipeline is worse than none, because it fails for reasons
+nobody investigates and trains everyone to ignore a red check. If the second host exists only
+to mirror the source, give it no pipeline at all rather than a decorative one.
 
 **Gate policy:** a newly-added scanner starts in report mode (soft-fail); tighten it to a
 hard gate once the baseline is clean — but **never silently drop one**.
@@ -115,8 +132,13 @@ A service repo pipeline never touches a cluster, and never runs `kubectl apply`.
 
 ## Published artifacts
 
-- Image → `registry.gitlab.com/@@GROUP@@/@@PROJECT@@`
-- Chart (OCI) → `oci://registry.gitlab.com/job-agent/charts/@@PROJECT@@`
+- Image → `<registry>/@@GROUP@@/@@PROJECT@@`
+- Chart (OCI) → `oci://<registry>/<group>/charts/@@PROJECT@@`
 
-Both tagged with the same `GitVersion_SemVer`. Both in GitLab — there is no second registry
-to keep in sync.
+Both tagged with the same `GitVersion_SemVer`, and both in the **same registry** — the one
+the hosting platform already provides. A second registry is a second set of credentials, a
+second retention policy and a second thing to be out of sync; adopt one only for a reason
+that survives being written down.
+
+The concrete paths are the consuming group's to choose and belong in its own
+`docs/architecture.md`, not here.

@@ -64,7 +64,7 @@ GROUP="$(read_cfg GROUP)"
 DESCRIPTION="$(read_cfg DESCRIPTION)"
 # Distribution name for a published package. Defaults to PROJECT, but a library
 # inside a group almost always needs a namespaced name (project "shared" ->
-# distribution "job-agent-shared") or its consumers pin a name that resolves to
+# distribution "<group>-shared") or its consumers pin a name that resolves to
 # nothing, or to an unrelated package on public PyPI.
 DIST="$(read_cfg DIST_NAME)"
 : "${DIST:=${PROJECT}}"

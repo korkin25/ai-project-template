@@ -56,18 +56,18 @@ constraint just hides the diff.)
 `bundle.yaml` is the only file that carries a version, and the only file a release touches.
 
 ```yaml
-name: job-agent-dev            # prefix for generated resource names
-namespace: job-agent           # the Kubernetes namespace; also the URL segment
+name: <platform>-dev           # prefix for generated resource names
+namespace: <platform>          # the Kubernetes namespace; also the URL segment
 publish_domain: dev.example    # base domain for exposed services
-imageRegistry: registry.gitlab.com/job-agent
+imageRegistry: <registry>/<group>
 vaultPathPrefix: dev           # ExternalSecret keys resolve under this
 microservices:
-  - service: processing
-    repoURL: oci://registry.gitlab.com/job-agent/charts
+  - service: <service>
+    repoURL: oci://<registry>/<group>/charts
     chartVersion: 0.1.3        # EXPLICIT. never a range.
 platform:
-  - component: redpanda
-    repoURL: oci://.../redpanda
+  - component: <component>     # a shared data service, message bus, operator…
+    repoURL: oci://<registry>/<path>/<component>
     chartVersion: 5.9.2
 ```
 

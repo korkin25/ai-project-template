@@ -1,7 +1,7 @@
 <!-- GENERATED FILE — DO NOT EDIT.
      Sources : standard/base.md + standard/profiles/service.md + standard/repo.env
      Profile : service
-     Sources-SHA256: 15f07eea2882f4d1b4f5c15d8ff38daf8229e030572fce79a0e9e5cfb6660b3c
+     Sources-SHA256: 5d7d8cfa0ccf7e00c2631b2756df76e760cdc5fcc555c9ed20ca7ea8b3a005d9
      Regenerate: ./standard/compose.sh
      Edit the sources, never this file. CI fails a change where the two disagree.
 -->
@@ -53,6 +53,41 @@ Three hard rules make this stable, not just advisory:
 3. **Per-turn reminder.** A hook re-injects this map every turn for Claude Code, so it
    can't drift out of context. Other agents read it here.
 
+## Changing the rules — the standard is upstream
+
+`ai-project-template` is **the standard**, not a sample. Every future project is spawned from
+it, so a rule that exists only in one repository is not a rule — it is a local habit that the
+next repository will not have.
+
+**When the user asks for a new rule, it goes into the standard first.** Write it in
+`standard/base.md` (if it binds every profile) or `standard/profiles/<p>.md` (if it binds one
+kind of repo), regenerate, and only then apply it here. Adding it straight to a project's
+`CLAUDE.md` is doubly wrong: the file is generated, so the change is erased on the next run,
+and the eleven other repositories never learn about it.
+
+Which is which:
+
+| It belongs in the standard | It stays in this repo |
+|---|---|
+| How work is tracked, tested, reviewed, released | What this service does |
+| What every repo must document, and where | This system's data model, topics, endpoints |
+| Safety, autonomy and security boundaries | Which library version this repo pins |
+| What "done" means | This repo's own backlog |
+
+The test: **would a brand-new, unrelated project need this?** If yes, it is the standard. If
+it only makes sense for *this* system, it is architecture and lives in `docs/architecture.md`.
+
+**Propagation is part of the change, not a follow-up.** A rule added upstream is not finished
+until every repo carrying a generated `CLAUDE.md` has been regenerated from the new sources.
+Until then the group is running two different standards and neither is authoritative. Where
+the standard is vendored per repo rather than referenced, the drift gate is what catches a
+copy that fell behind — which is why that gate is load-bearing rather than cosmetic.
+
+**The standard obeys itself.** This repository is the first consumer of every rule it
+publishes. If its own `TODO.md`, `CHANGELOG.md` or `AUTOPILOT-LOG.md` does not satisfy a rule
+written here, the rule is not yet real — fix the repository, or withdraw the rule. A standard
+whose reference implementation fails it teaches every reader that the rules are optional.
+
 ## What this project is
 
 `ai-project-template` — the reference implementation of this development standard. It lives at `korkin25/ai-project-template` and follows the
@@ -100,6 +135,34 @@ Keep docs in lockstep with the code, **in the same change** — never wait to be
   feature; a done+verified task moves to `CHANGELOG.md` in the same change.
 - Never mark a task done without proof it works — see **Testing policy**.
 
+### Capture first — every request lands in `TODO.md` immediately
+
+**When the user asks for something, write it into `TODO.md` before doing anything else** —
+before answering, before designing, before touching code. Not at the end of the task, not
+"once it is clear enough": immediately, in the turn it was asked.
+
+This is not bookkeeping. A conversation carries a dozen requests, and the ones that get lost
+are never the ones being worked on — they are the asides: "and later we should…", "also fix
+that", "remember about the GPU". A session ends, context is compacted, an agent is replaced,
+and an unwritten request simply stops existing. `TODO.md` is the only thing that survives all
+three.
+
+- **One row per request, in the user's terms**, not in your restatement of them. If you do not
+  yet understand it well enough to size it, log it anyway and mark it `⬜` — an unclear row is
+  recoverable, a forgotten one is not.
+- **Log it even if you are about to do it right now.** Work is interrupted more often than it
+  is finished, and the row costs one line.
+- **Log it even if you disagree with it.** Record the request, then argue in the reply. Never
+  resolve a disagreement by not writing it down.
+- **Multi-part requests become multiple rows.** "Fix the GPU, tidy the gitops and start the
+  split" is three tickets, not one, because they finish at different times.
+- **Cross-repo requests get a platform id** in the platform repo, plus a local row in each
+  repo that has to act — see *Ticket ids*.
+- When something is done, it moves to `CHANGELOG.md` under the same rule as any other task.
+
+The test for whether this is being followed: after any conversation, everything the user
+asked for is findable in a file. If it is only in the chat, it is already lost.
+
 ## Multi-repo — this repo is one of many
 
 This repository is **one deploy unit inside a larger platform**. One repo = one thing that
@@ -128,11 +191,12 @@ repo, and never reused.
 Prefixes are **unique across the whole group**, so an id is globally unambiguous and can be
 cited from another repo's `TODO.md` or MR without qualification.
 
-Work that spans repos gets a **platform id** (`JAP-<n>`) recorded in the platform repo. Each
-participating repo opens its own local ticket that references it:
+Work that spans repos gets a **platform id** — the platform repo's own prefix, written
+`<PLATFORM>-<n>` below — recorded there. Each participating repo opens its own local ticket
+that references it:
 
 ```
-| PRJ-14 | 🟡 | Emit `apply-dispatch` v2 | part of JAP-7; consumer side is DISP-3 |
+| PRJ-14 | 🟡 | Emit the v2 event shape | part of <PLATFORM>-7; consumer side is <OTHER>-3 |
 ```
 
 Never renumber, and never let a local id leak into another repo as if it were global.
@@ -149,7 +213,7 @@ that must never go stale.
 
 **Changing a contract you own — the protocol:**
 
-1. **Design it as a platform decision.** Open `JAP-D<n>` in the platform repo: what changes,
+1. **Design it as a platform decision.** Open `<PLATFORM>-D<n>` in the platform repo: what changes,
    who consumes it today, whether the change is compatible, and the migration path.
    A breaking contract change is an architectural decision — **it requires user approval**.
 2. **Prefer additive.** Add a field, do not repurpose one. Add a topic or a version suffix,
@@ -532,7 +596,9 @@ docs/                   architecture.md, configuration.md, tests.md, contracts.m
 The pipeline is **composition, not inline jobs** — every job comes from the shared templates.
 **New shared CI logic belongs in the templates repo, never in this repo.**
 
-**GitLab** (`.gitlab-ci.yml`) includes, from `open_ci_cd/templates`:
+On **GitLab**, `.gitlab-ci.yml` includes these from the group's shared CI-templates repo. On
+**GitHub** the equivalents are reusable workflows; the job set and its guarantees are the
+same, and the table below is the contract either way.
 
 | Include | Gives |
 |---|---|
@@ -549,24 +615,39 @@ The pipeline is **composition, not inline jobs** — every job comes from the sh
 deliberate, per-repo act. A moving branch does the opposite: one upstream commit changes the
 pipeline in every repository at once, including the ones that were green a minute ago.
 
-This platform currently tracks `main` **by deliberate choice** — the templates repo has no
-usable tag (its only tag trails `main` by hundreds of commits and lacks most of the files
-included here), and same-day access to template fixes is worth more than reproducibility at
-this stage. Revisit once the templates repo starts cutting real releases. Do not "fix" this
-to a tag without checking that the tag actually contains every included file.
+**Prefer a tag. Tracking a branch is allowed, but only as a recorded decision** — written in
+`docs/architecture.md` with its blast radius stated plainly — never as something nobody got
+around to. It is a defensible trade-off when the templates repo cuts no releases and same-day
+access to fixes is worth more than reproducibility; it is indefensible when it happened by
+accident. Before switching an existing repo to a tag, check the tag actually contains every
+included file: a tag that trails the branch by a long way is worse than the branch.
 
 `docker-sign.yml` is **deprecated** — signing already happens inside `docker-build.yml`.
 Do not include it.
 
-**GitLab is the only platform a repo is required to support.** Images, charts and packages
-all live in the GitLab registries of the owning group; no repo needs a GitHub account, a
-GHCR path or a GitHub Actions workflow to be complete.
+### Choosing a host
 
-**GitHub is optional.** A repo that is *also* published to GitHub (the upstream standard
-template is) mirrors the same gates through
-[`korkin25/open-ci-actions@v1`](https://github.com/korkin25/open-ci-actions)
-(`detect` → `python` / `sast` / `docker` / `helm` / `functional`). Keep the two in parity or
-drop the GitHub half entirely — a half-maintained second pipeline is worse than none.
+**This standard is host-agnostic.** The gates, the artifacts and the release model are the
+same on GitLab and on GitHub; only the wiring differs. **A project picks one host, once, and
+records the choice in its own `docs/architecture.md`** — that is a project decision, never
+the standard's.
+
+| | GitLab | GitHub |
+|---|---|---|
+| Pipeline | `.gitlab-ci.yml`, composed from `include:` of a shared templates repo | `.github/workflows/ci.yml`, composed from `uses:` of a reusable-workflow repo |
+| Job set | `globals` · `auto-semversioning` · `lint` · `sast` · `docker-build` · `helm-package` · `functional` · `commit_changes` | `detect` → `python` / `sast` / `docker` / `helm` / `functional` |
+| Images | the group's container registry | the org's container registry |
+| Charts (OCI) | the same registry, under a charts path | the same registry, under a charts path |
+| Packages | the group's package registry | the language's public index, or the org's |
+| Review unit | merge request | pull request |
+| Ownership | `CODEOWNERS` + approval rules | `CODEOWNERS` + required reviewers |
+| Dependency bot | Renovate | Dependabot or Renovate |
+| Templates | `.gitlab/merge_request_templates/` | `.github/PULL_REQUEST_TEMPLATE.md` |
+
+**Support exactly one.** Publishing to both is allowed only when someone owns keeping them in
+parity: a half-maintained second pipeline is worse than none, because it fails for reasons
+nobody investigates and trains everyone to ignore a red check. If the second host exists only
+to mirror the source, give it no pipeline at all rather than a decorative one.
 
 **Gate policy:** a newly-added scanner starts in report mode (soft-fail); tighten it to a
 hard gate once the baseline is clean — but **never silently drop one**.
@@ -618,8 +699,13 @@ A service repo pipeline never touches a cluster, and never runs `kubectl apply`.
 
 ## Published artifacts
 
-- Image → `registry.gitlab.com/korkin25/ai-project-template`
-- Chart (OCI) → `oci://registry.gitlab.com/job-agent/charts/ai-project-template`
+- Image → `<registry>/korkin25/ai-project-template`
+- Chart (OCI) → `oci://<registry>/<group>/charts/ai-project-template`
 
-Both tagged with the same `GitVersion_SemVer`. Both in GitLab — there is no second registry
-to keep in sync.
+Both tagged with the same `GitVersion_SemVer`, and both in the **same registry** — the one
+the hosting platform already provides. A second registry is a second set of credentials, a
+second retention policy and a second thing to be out of sync; adopt one only for a reason
+that survives being written down.
+
+The concrete paths are the consuming group's to choose and belong in its own
+`docs/architecture.md`, not here.

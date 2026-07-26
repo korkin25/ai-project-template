@@ -46,6 +46,41 @@ Three hard rules make this stable, not just advisory:
 3. **Per-turn reminder.** A hook re-injects this map every turn for Claude Code, so it
    can't drift out of context. Other agents read it here.
 
+## Changing the rules — the standard is upstream
+
+`ai-project-template` is **the standard**, not a sample. Every future project is spawned from
+it, so a rule that exists only in one repository is not a rule — it is a local habit that the
+next repository will not have.
+
+**When the user asks for a new rule, it goes into the standard first.** Write it in
+`standard/base.md` (if it binds every profile) or `standard/profiles/<p>.md` (if it binds one
+kind of repo), regenerate, and only then apply it here. Adding it straight to a project's
+`CLAUDE.md` is doubly wrong: the file is generated, so the change is erased on the next run,
+and the eleven other repositories never learn about it.
+
+Which is which:
+
+| It belongs in the standard | It stays in this repo |
+|---|---|
+| How work is tracked, tested, reviewed, released | What this service does |
+| What every repo must document, and where | This system's data model, topics, endpoints |
+| Safety, autonomy and security boundaries | Which library version this repo pins |
+| What "done" means | This repo's own backlog |
+
+The test: **would a brand-new, unrelated project need this?** If yes, it is the standard. If
+it only makes sense for *this* system, it is architecture and lives in `docs/architecture.md`.
+
+**Propagation is part of the change, not a follow-up.** A rule added upstream is not finished
+until every repo carrying a generated `CLAUDE.md` has been regenerated from the new sources.
+Until then the group is running two different standards and neither is authoritative. Where
+the standard is vendored per repo rather than referenced, the drift gate is what catches a
+copy that fell behind — which is why that gate is load-bearing rather than cosmetic.
+
+**The standard obeys itself.** This repository is the first consumer of every rule it
+publishes. If its own `TODO.md`, `CHANGELOG.md` or `AUTOPILOT-LOG.md` does not satisfy a rule
+written here, the rule is not yet real — fix the repository, or withdraw the rule. A standard
+whose reference implementation fails it teaches every reader that the rules are optional.
+
 ## What this project is
 
 `@@PROJECT@@` — @@DESCRIPTION@@. It lives at `@@GROUP@@/@@PROJECT@@` and follows the
@@ -93,6 +128,34 @@ Keep docs in lockstep with the code, **in the same change** — never wait to be
   feature; a done+verified task moves to `CHANGELOG.md` in the same change.
 - Never mark a task done without proof it works — see **Testing policy**.
 
+### Capture first — every request lands in `TODO.md` immediately
+
+**When the user asks for something, write it into `TODO.md` before doing anything else** —
+before answering, before designing, before touching code. Not at the end of the task, not
+"once it is clear enough": immediately, in the turn it was asked.
+
+This is not bookkeeping. A conversation carries a dozen requests, and the ones that get lost
+are never the ones being worked on — they are the asides: "and later we should…", "also fix
+that", "remember about the GPU". A session ends, context is compacted, an agent is replaced,
+and an unwritten request simply stops existing. `TODO.md` is the only thing that survives all
+three.
+
+- **One row per request, in the user's terms**, not in your restatement of them. If you do not
+  yet understand it well enough to size it, log it anyway and mark it `⬜` — an unclear row is
+  recoverable, a forgotten one is not.
+- **Log it even if you are about to do it right now.** Work is interrupted more often than it
+  is finished, and the row costs one line.
+- **Log it even if you disagree with it.** Record the request, then argue in the reply. Never
+  resolve a disagreement by not writing it down.
+- **Multi-part requests become multiple rows.** "Fix the GPU, tidy the gitops and start the
+  split" is three tickets, not one, because they finish at different times.
+- **Cross-repo requests get a platform id** in the platform repo, plus a local row in each
+  repo that has to act — see *Ticket ids*.
+- When something is done, it moves to `CHANGELOG.md` under the same rule as any other task.
+
+The test for whether this is being followed: after any conversation, everything the user
+asked for is findable in a file. If it is only in the chat, it is already lost.
+
 ## Multi-repo — this repo is one of many
 
 This repository is **one deploy unit inside a larger platform**. One repo = one thing that
@@ -121,11 +184,12 @@ repo, and never reused.
 Prefixes are **unique across the whole group**, so an id is globally unambiguous and can be
 cited from another repo's `TODO.md` or MR without qualification.
 
-Work that spans repos gets a **platform id** (`JAP-<n>`) recorded in the platform repo. Each
-participating repo opens its own local ticket that references it:
+Work that spans repos gets a **platform id** — the platform repo's own prefix, written
+`<PLATFORM>-<n>` below — recorded there. Each participating repo opens its own local ticket
+that references it:
 
 ```
-| @@PREFIX@@-14 | 🟡 | Emit `apply-dispatch` v2 | part of JAP-7; consumer side is DISP-3 |
+| @@PREFIX@@-14 | 🟡 | Emit the v2 event shape | part of <PLATFORM>-7; consumer side is <OTHER>-3 |
 ```
 
 Never renumber, and never let a local id leak into another repo as if it were global.
@@ -142,7 +206,7 @@ that must never go stale.
 
 **Changing a contract you own — the protocol:**
 
-1. **Design it as a platform decision.** Open `JAP-D<n>` in the platform repo: what changes,
+1. **Design it as a platform decision.** Open `<PLATFORM>-D<n>` in the platform repo: what changes,
    who consumes it today, whether the change is compatible, and the migration path.
    A breaking contract change is an architectural decision — **it requires user approval**.
 2. **Prefer additive.** Add a field, do not repurpose one. Add a topic or a version suffix,
