@@ -1,0 +1,71 @@
+# Package metadata for @@PROJECT@@ — published to the group PyPI registry.
+#
+# A library's dependencies become EVERY consumer's dependencies, transitively and
+# unavoidably. That is why the required set below is empty and anything optional lives
+# behind an extra: a service that only needs the envelope type should not inherit a database
+# driver, its CVEs, or its own transitive tree.
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+# The DISTRIBUTION name — what consumers `pip install` and pin. Not the import name:
+# that is the package under src/ (@@PKG@@). Keeping them different is normal and
+# deliberate for a namespaced library.
+name = "@@DIST@@"
+# DYNAMIC — the version is written at publish time by CI (`hatch version <PEP 440>`, see
+# .gitlab-ci.yml) from GitVersion_SemVer. A literal here would be a second opinion about the
+# version, and it would be the stale one: nobody remembers to bump a number that the build
+# does not read.
+dynamic = ["version"]
+description = "@@DESCRIPTION@@"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+
+# RANGES, never exact pins. A library that pins `x==1.2.3` makes itself un-composable: any
+# consumer that needs 1.2.4 for a security fix now has an unsolvable dependency graph. Pins
+# belong in applications, which are installed alone; ranges belong in libraries, which are
+# installed together with everything else.
+dependencies = []
+
+[project.optional-dependencies]
+# The `dev` extra is what CI installs: /lint.yml runs `pip install -e ".[dev]"` (name from
+# PYTHON_DEV_EXTRA, default "dev") and then expects ruff, mypy and pytest to be importable.
+# Renaming this extra silently degrades the whole Python gate to "tool not found".
+dev = [
+    "pytest>=8",
+    "pytest-cov>=5",
+    "ruff>=0.5",
+    "mypy>=1.10",
+]
+
+# Feature extras go here, one per optional capability, e.g.
+#   kafka = ["confluent-kafka>=2.3,<3"]
+# so a consumer opts in with `@@PROJECT@@[kafka]` and everyone else keeps a small tree.
+
+[tool.hatch.version]
+path = "src/@@PKG@@/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/@@PKG@@"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.mypy]
+# The FLOOR of the support matrix: consumers may run 3.11, so type-checking against 3.11
+# catches a 3.12-only construct before it reaches them as a runtime error.
+python_version = "3.11"
+files = ["src", "tests"]
+# A library's types are part of its API — an unannotated public function silently disables
+# type checking in every consumer that calls it.
+disallow_untyped_defs = true
+warn_unused_ignores = true
+ignore_missing_imports = true

@@ -1,0 +1,40 @@
+{{- if .Values.httpRoute.enabled }}
+{{- if not .Values.httpRoute.parentRefs }}
+{{- fail "httpRoute.enabled=true requires httpRoute.parentRefs — an HTTPRoute with no parentRef is accepted by the API server and then silently routes nothing" }}
+{{- end }}
+{{- if not .Values.service.enabled }}
+{{- fail "httpRoute.enabled=true requires service.enabled=true — an HTTPRoute needs a Service to send traffic to" }}
+{{- end }}
+# Gateway API HTTPRoute — deliberately NOT an Ingress.
+#
+# Ingress is feature-frozen upstream and every non-trivial behaviour (header matching,
+# traffic splitting, timeouts) lives in controller-specific annotations, which makes the
+# manifest unportable and unreviewable. HTTPRoute expresses the same things as typed fields.
+#
+# The Gateway itself is a cluster-wide resource owned by the INFRA repo; this chart only
+# attaches to it by reference. That split is why parentRefs has no default here: only the
+# platform's environment values know which Gateway (and which listener) exists in that
+# cluster, and guessing produces a route that is Accepted=False with no user-visible error.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "@@PROJECT@@.fullname" . }}
+  labels:
+    {{- include "@@PROJECT@@.labels" . | nindent 4 }}
+spec:
+  parentRefs:
+    {{- toYaml .Values.httpRoute.parentRefs | nindent 4 }}
+  {{- with .Values.httpRoute.hostnames }}
+  hostnames:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    {{- range .Values.httpRoute.rules }}
+    - matches:
+        {{- toYaml .matches | nindent 8 }}
+      backendRefs:
+        # $ (the root context) because `range` rebound the dot to the current rule.
+        - name: {{ include "@@PROJECT@@.fullname" $ }}
+          port: {{ .backendPort | default $.Values.service.port }}
+    {{- end }}
+{{- end }}

@@ -1,0 +1,37 @@
+# Credentials and cluster access — NEVER commit. This is the repo where the temptation is
+# highest: bootstrap secrets are handled here by definition, and "just for a minute" is how
+# a kubeconfig ends up in git history forever. The values themselves come from the
+# environment or from a secret store; the procedure that seeds them is documented in
+# docs/configuration.md.
+*.kubeconfig
+kubeconfig*
+.env
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+!ca-bundle.crt
+secrets.*
+vault-token
+*.retry
+
+# Ansible working state (collections and roles are downloaded, never vendored — they are
+# pinned in requirements.yml instead, which is the reviewable form).
+.ansible/
+collections/ansible_collections/
+roles/*/
+!roles/README.md
+.venv/
+venv/
+__pycache__/
+
+# Rendered output. What is applied must be reproducible from the source in git; a committed
+# render is a second source of truth and guarantees drift.
+rendered/
+*.tgz
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store

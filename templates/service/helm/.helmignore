@@ -1,0 +1,13 @@
+# Files excluded from the packaged chart. Keeping the artifact minimal is not cosmetic:
+# everything in the .tgz is pulled by every cluster on every reconcile, and anything
+# accidentally left in a chart directory (a values file with real credentials, a kubeconfig)
+# would be published to the registry.
+.DS_Store
+.git/
+.gitignore
+*.tgz
+*.orig
+*.bak
+*~
+# Rendered output produced by helm-package.yml for debugging; never part of the chart.
+helm-template-output.yaml

@@ -1,0 +1,17 @@
+---
+# Ansible COLLECTIONS this repo depends on. Installed with:
+#   ansible-galaxy collection install -r collections/requirements.yml -p collections/
+#
+# Pinned exactly, for the same reason as roles/requirements.yml: a collection is executed
+# code that runs with the privileges of the play. `>=` here would mean a routine re-run
+# could pick up a new major version of a module and change what "the same playbook" does.
+#
+# Kept minimal: every collection is a supply-chain dependency of the substrate, and the
+# substrate is the thing everything else assumes.
+collections:
+  - name: kubernetes.core
+    version: "5.0.0"        # k8s modules — used to install cluster prerequisites
+  - name: ansible.posix
+    version: "2.0.0"        # sysctl, mount, selinux — the host-level primitives
+  - name: community.general
+    version: "10.1.0"       # misc modules; drop it if nothing here needs one

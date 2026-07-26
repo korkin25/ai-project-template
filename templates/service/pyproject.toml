@@ -1,0 +1,67 @@
+# Package metadata and tool configuration for @@PROJECT@@.
+#
+# The image installs this package (`pip install .` in deploy/Dockerfile), so the dependency
+# list here is the runtime dependency list — there is no second requirements.txt to drift
+# out of sync with it.
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "@@PROJECT@@"
+# DYNAMIC, never a literal. GitVersion is the single source of the version for the image,
+# the chart and this package alike; a number typed here would be a fourth opinion, and it
+# would be the one nobody remembers to bump. See GitVersion.yml.
+dynamic = ["version"]
+description = "@@DESCRIPTION@@"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+# Empty on purpose: the skeleton runs on the standard library alone (health server,
+# logging, signals). Every dependency added here is also added to the image, the SBOM and
+# every CVE triage — so add one for a reason, pin a RANGE, and say why in the MR.
+dependencies = []
+
+[project.optional-dependencies]
+# The `dev` extra is what CI installs: /lint.yml runs `pip install -e ".[dev]"` (the extra
+# name comes from PYTHON_DEV_EXTRA, default "dev") and then expects ruff, mypy and pytest to
+# be importable. Renaming this extra, or dropping one of those three, turns the whole Python
+# gate into a fallback `pip install -e .` followed by "command not found".
+dev = [
+    "pytest>=8",
+    "pytest-cov>=5",
+    "ruff>=0.5",
+    "mypy>=1.10",
+]
+
+# Hatch reads __version__ out of the package. The publish/build step overwrites that
+# constant with GitVersion_SemVer, so the wheel, the image tag and the chart version are the
+# same number by construction rather than by discipline.
+[tool.hatch.version]
+path = "src/@@PKG@@/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/@@PKG@@"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.mypy]
+# python_version is the FLOOR of the support matrix (/lint.yml runs the gate on 3.11 and
+# 3.12): type-checking against the oldest supported interpreter is what catches a 3.12-only
+# construct before it reaches a 3.11 runtime.
+python_version = "3.11"
+files = ["src", "tests"]
+# Untyped code silently disables mypy for the function it appears in, so an unannotated
+# helper is not "not yet typed" — it is a hole in every check that passes through it.
+disallow_untyped_defs = true
+warn_unused_ignores = true
+# Third-party packages without stubs would otherwise be a wall of "missing library stubs"
+# noise that hides the real findings.
+ignore_missing_imports = true

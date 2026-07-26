@@ -1,0 +1,146 @@
+---
+# CI/CD for @@PROJECT@@ — profile: library.
+#
+# A library builds no image and deploys nothing; its product is an API that other repos pin.
+# The pipeline is therefore short by design: version it, prove it still compiles and still
+# means what it meant, scan it, and publish it.
+#
+# Docker and Helm jobs are absent WITHOUT being disabled. Every job in the shared templates
+# guards its rules with `exists:` on a marker file (${DOCKERFILE}, ${CHART_PATH}/Chart.yaml);
+# this repo has neither, so those jobs are never created. Nothing needs switching off, and
+# adding a deploy/Dockerfile here would silently start producing an image — which is the
+# signal that the repo has stopped being a library.
+include:
+  - project: "open_ci_cd/templates"
+    # PINNED TO A TAG — never `ref: "main"`.
+    # These templates are executed code from another repository, running with this project's
+    # CI_JOB_TOKEN and its registry credentials. On a moving branch one upstream commit
+    # changes every repo's pipeline at once, with no MR, no review and no way to reproduce
+    # yesterday's build. Bump this pin in an MR like any other dependency.
+    ref: "@@CI_TEMPLATES_REF@@"
+    file:
+      - "/globals.yml"           # stages, runner-tag anchors, shared variables
+      - "/auto-semversioning.yml" # get_unique_semversion -> GitVersion_SemVer
+      - "/lint.yml"              # ruff + mypy + pytest (3.11/3.12) + radon/xenon
+      - "/sast.yml"              # gitleaks, semgrep, bandit, pip-audit, checkov, trivy(fs)
+
+variables:
+  # Lint and type-check only what this repo authors.
+  PYTHON_LINT_PATHS: "src tests"
+
+  # A library's tests ARE its tier-(a) suite — there is no image to boot — so an empty run
+  # must be a failure rather than a warning. A published package that nothing exercised is
+  # how a breaking change reaches every consumer at once.
+  PYTEST_ALLOW_NO_TESTS: "false"
+
+# ---------------------------------------------------------------------------------------
+# Runner tags — READ THIS BEFORE "CLEANING UP" THE BLOCKS BELOW
+# ---------------------------------------------------------------------------------------
+# globals.yml tags jobs through two anchors, `.default_runner` and `.default_runner_infra`,
+# whose value comes from ${RUNNER_TAG} / ${RUNNER_TAG_INFRA} (default:
+# `saas-linux-small-amd64`, GitLab.com's shared SaaS runners). Overriding the anchors here
+# retargets every job that EXTENDS them onto our own fleet; the main file wins over an
+# include, and the anchors carry nothing but `tags`, so the override is complete.
+#
+# `get_unique_semversion` (auto-semversioning.yml) is a plain job with NO `extends:` at all,
+# so it inherits no tags and is eligible for ANY runner the project can see — in practice it
+# escapes to the SaaS shared runners, burning paid minutes or hanging in `pending` where the
+# project has no shared-runner entitlement. Overriding `.default_runner` does not reach it.
+# That is why the third block exists and why it is not redundant. The shared templates are
+# not ours to patch, and a per-job `tags:` in the main file wins over the include.
+#
+# In the service template a FOURTH block overrides `SBOM-cyclonedx-image` (docker-build.yml)
+# for the same reason. It is deliberately absent here: that job does not exist in this
+# pipeline, and naming a non-existent job would CREATE one — a job with `tags` and no
+# `script`, which fails the whole config with "jobs:SBOM-cyclonedx-image config should
+# implement a script: or trigger: keyword". Add the block only if this repo ever includes
+# /docker-build.yml, which for a library it should not.
+#
+# The tag must be a LITERAL: GitLab expands variables in `tags` but not nested references
+# (gitlab-org/gitlab#407129), so a variable holding another variable becomes a literal tag
+# string and the job never matches a runner. `job-agent-local` is the group's self-hosted
+# runner, registered by the infra repo — replace it with your fleet's tag in all three
+# blocks, which must stay in sync.
+.default_runner:
+  tags:
+    - job-agent-local
+
+.default_runner_infra:
+  tags:
+    - job-agent-local
+
+get_unique_semversion:
+  tags:
+    - job-agent-local
+
+# ---------------------------------------------------------------------------------------
+# Publish to the group PyPI registry
+# ---------------------------------------------------------------------------------------
+# Inline rather than included because the shared templates have no Python publish job yet.
+# If a second repo needs this, MOVE IT INTO open_ci_cd/templates instead of copying it —
+# a publish job duplicated across repos is a supply-chain surface maintained in n places.
+publish_pypi:
+  stage: package
+  extends:
+    - .default_runner
+  image: "${PYTHON_IMAGE}"
+  needs:
+    - job: get_unique_semversion
+      artifacts: true          # brings GitVersion_SemVer in as a dotenv variable
+  rules:
+    # GATED ON BRANCHES, NOT ON TAGS — deliberately.
+    # The branch model is feature/* -> dev -> rc -> release and there are NO git tags: a
+    # merge to `rc` publishes a pre-release, a merge to `release` publishes the stable
+    # version, and both merges are approval-gated. A `$CI_COMMIT_TAG` rule here would never
+    # fire, and creating a tag to make it fire would also break GitVersion, which computes
+    # the version from the branch graph plus `next-version` precisely because there are no
+    # tags to read.
+    - if: $CI_COMMIT_BRANCH == "rc" || $CI_COMMIT_BRANCH == "release"
+      when: on_success
+    # Everything else — feature branches, dev, MRs — builds and tests but never publishes.
+    # An accidental publish cannot be undone: PyPI-style registries refuse re-uploads of a
+    # version, so a bad artifact is permanent and must be superseded rather than replaced.
+    - when: never
+  script:
+    - |
+      set -euo pipefail
+
+      if [ -z "${GitVersion_SemVer:-}" ]; then
+        echo "ERROR: GitVersion_SemVer is unset — get_unique_semversion did not run or its dotenv was not fetched"
+        exit 1
+      fi
+
+      # GitVersion emits SemVer 2.0 ("0.4.0-rc.3"); Python packaging requires PEP 440
+      # ("0.4.0rc3"). Left untranslated, the build backend either rejects the string or
+      # normalises it silently — and a package whose version differs from the one in the
+      # release notes is unfindable by the consumer who was told to pin it.
+      PY_VERSION="$(printf '%s' "${GitVersion_SemVer}" \
+        | sed -E 's/-alpha\.?([0-9]+)/a\1/; s/-rc\.?([0-9]+)/rc\1/; s/-dev\.?([0-9]+)/.dev\1/; s/\+.*$//')"
+      echo "INFO: GitVersion_SemVer=${GitVersion_SemVer} -> PEP 440 ${PY_VERSION}"
+
+      python -m pip install --quiet --upgrade pip
+      python -m pip install --quiet hatch build twine
+
+      # hatch writes the version into src/@@PKG@@/__init__.py (the [tool.hatch.version]
+      # source) and VALIDATES it as PEP 440 first, so a malformed version fails here rather
+      # than producing an unusable artifact.
+      hatch version "${PY_VERSION}"
+
+      python -m build
+      # Catches a broken long_description/metadata before upload, which the registry would
+      # otherwise accept and every consumer's tooling would then choke on.
+      twine check dist/*
+
+      # The project-scoped registry, authenticated with the job token: no long-lived
+      # credential exists for CI to leak, and the token dies with the job.
+      TWINE_USERNAME="gitlab-ci-token" \
+      TWINE_PASSWORD="${CI_JOB_TOKEN}" \
+      twine upload --non-interactive \
+        --repository-url "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi" \
+        dist/*
+
+      echo "INFO: published @@PROJECT@@ ${PY_VERSION} — consumers pin it as '@@PROJECT@@~=${PY_VERSION%.*}'"
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1 week

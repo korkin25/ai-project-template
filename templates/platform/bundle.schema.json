@@ -1,0 +1,119 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gitlab.com/job-agent/platform/gitops/-/raw/dev/bundle.schema.json",
+  "title": "Environment bundle",
+  "description": "One bundle describes exactly one deployable environment (one Kubernetes namespace): what runs there and at which version. It never describes HOW something is deployed (that is the chart) nor WITH WHAT configuration (that is values/). It is the only file a release touches, and the only file the renderer reads.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "namespace", "imageRegistry", "microservices", "platform"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$",
+      "description": "Unique bundle identifier, used as the prefix of every generated resource name (e.g. 'job-agent-dev' -> HelmRelease 'job-agent-dev-processing')."
+    },
+    "namespace": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$",
+      "description": "Kubernetes namespace every component is deployed into. Also the subdomain segment in service URLs: {service}.{namespace}.{publishDomain}."
+    },
+    "publishDomain": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Base domain for exposed services. Passed to charts as global.publishDomain. Omit for an environment that exposes nothing."
+    },
+    "imageRegistry": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Registry prefix for service images. A chart resolves image.repository = {imageRegistry}/{service}. Passed to charts as global.imageRegistry."
+    },
+    "vaultPathPrefix": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Secret-store path prefix for this environment (e.g. 'dev'). ExternalSecret keys resolve as {vaultPathPrefix}/{path}, so a dev bundle structurally cannot read production keys. Passed to charts as global.vaultPathPrefix."
+    },
+    "imagePullSecret": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Name of the dockerconfigjson Secret used to pull both images and OCI charts. Must already exist in the target namespace AND in the Flux namespace; it is provisioned by the infra repo, not here."
+    },
+    "interval": {
+      "type": "string",
+      "pattern": "^[0-9]+(ms|s|m|h)$",
+      "description": "Reconcile interval applied to every generated resource. Default 30m."
+    },
+    "microservices": {
+      "type": "array",
+      "minItems": 0,
+      "description": "Application services owned by this platform. Each entry deploys one chart published by that service's own repository.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["service", "repoURL", "chartVersion"],
+        "properties": {
+          "service": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$",
+            "description": "One string with three roles: the chart name, the values filename (values/{service}.yaml), and the generated resource name suffix. Never let them diverge."
+          },
+          "repoURL": {
+            "type": "string",
+            "pattern": "^oci://",
+            "description": "OCI registry base, WITHOUT the chart name. The renderer appends /{service}."
+          },
+          "chartVersion": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+([-+].+)?$",
+            "description": "EXACT version. Ranges are rejected by construction: a range means nobody can state what is running, and a rollback stops being a revert."
+          },
+          "disabled": {
+            "type": "boolean",
+            "description": "Skip rendering this entry without deleting it, so the pinned version survives the outage window. Prefer this over commenting the block out."
+          }
+        }
+      }
+    },
+    "platform": {
+      "type": "array",
+      "minItems": 0,
+      "description": "Third-party platform components this environment needs (message bus, databases, vector store). Cluster-wide operators do NOT belong here — they are owned by the infra repo.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["component", "chart", "repoURL", "chartVersion"],
+        "properties": {
+          "component": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[a-z0-9]([a-z0-9-]*[a-z0-9])?$",
+            "description": "Release name and values filename (values/{component}.yaml). Separate from 'chart' so the same chart can be deployed twice under different names."
+          },
+          "chart": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Chart name inside repoURL. Explicit rather than inferred, because a third-party chart name rarely equals the release name."
+          },
+          "repoURL": {
+            "type": "string",
+            "pattern": "^oci://",
+            "description": "OCI registry base, WITHOUT the chart name. The renderer appends /{chart}."
+          },
+          "chartVersion": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+([-+].+)?$",
+            "description": "EXACT version. See microservices[].chartVersion."
+          },
+          "disabled": {
+            "type": "boolean",
+            "description": "Skip rendering without losing the pin."
+          }
+        }
+      }
+    }
+  }
+}

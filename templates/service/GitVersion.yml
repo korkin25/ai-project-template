@@ -1,0 +1,50 @@
+---
+# GitVersion — THE single source of the version for @@PROJECT@@.
+#
+# One number per commit, used for all three artifacts: the container image tag, the Helm
+# chart version and the Python package version. That equality is what lets a platform
+# operator read `chartVersion: 1.4.2` in a bundle and know exactly which commit is running.
+#
+# Branch model: feature/* (-alpha) -> dev (-dev) -> rc (-rc) -> release (clean X.Y.Z).
+# There is NO main branch and there are NO git tags — releasing is a MERGE, and the version
+# comes from the branch graph plus `next-version` below.
+#
+# THE ONE KNOB IS `next-version`. Bump it to cut a new minor or major; patches increment
+# automatically on `release`. Never hand-write a version anywhere else — not in
+# pyproject.toml, not in Chart.yaml, not in docs. To read the current value:
+#   docker run --rm -v "$PWD:/repo" gittools/gitversion:6.3.0 /repo /showvariable SemVer
+#
+# This config is GitVersion 6.x-NATIVE. A 5.x-style config makes `next-version` fail to
+# parse on 6.8+ ("Failed to parse X into a Semantic Version"), and there is deliberately NO
+# `tag-prefix`: this repo has no tags for a prefix to match.
+mode: ContinuousDelivery
+next-version: 0.1.0
+
+branches:
+  dev:
+    regex: ^(origin/)?dev(elop)?(ment)?$
+    label: dev
+    increment: Patch
+    is-main-branch: true
+    source-branches: [feature, hotfix]
+  rc:
+    regex: ^(origin/)?rc$
+    label: rc
+    increment: Minor
+    source-branches: [dev]
+  release:
+    regex: ^(origin/)?release$
+    label: ""
+    increment: Patch
+    is-release-branch: true
+    source-branches: [rc, dev]
+  feature:
+    regex: ^(origin/)?features?[-/]
+    label: alpha
+    increment: Inherit
+    source-branches: [dev]
+  hotfix:
+    regex: ^(origin/)?hotfix(es)?[-/]
+    label: hotfix
+    increment: Patch
+    source-branches: [dev, release]

@@ -1,0 +1,37 @@
+---
+# Namespaces the platform assumes exist. They are created HERE rather than by whichever chart
+# happens to install first: a namespace owned by a chart disappears when that chart is
+# uninstalled, taking every other object in it along.
+#
+# The Pod Security Admission labels are the point of this file. They are enforced by the API
+# server at admission time, which makes them the one control that holds even when a chart is
+# misconfigured, a values file is overridden, or someone applies a manifest by hand.
+#   restricted = non-root, no privilege escalation, all capabilities dropped, seccomp on
+# — exactly the posture every service chart in this platform is already written for.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    # audit/warn at the same level surface a violation in `kubectl` output and the audit log
+    # instead of only failing the admission, which is what makes a rejection debuggable.
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+    app.kubernetes.io/managed-by: "@@PROJECT@@"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-system
+  labels:
+    # Cluster components (operators, controllers) often legitimately need more than
+    # `restricted` — a CNI or a CSI driver cannot run unprivileged. Keeping them in their own
+    # namespace means that exception is scoped to them and visible here, rather than being a
+    # blanket relaxation of the namespace where applications run.
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+    app.kubernetes.io/managed-by: "@@PROJECT@@"

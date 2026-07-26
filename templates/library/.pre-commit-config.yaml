@@ -1,0 +1,31 @@
+# Local gates that mirror CI, so a red pipeline is a surprise rather than routine.
+#
+# One-time setup per clone:
+#   pip install -e '.[dev]' && pip install pre-commit && pre-commit install
+#
+# A fast SUBSET of CI, never a replacement: mypy, the 3.11/3.12 pytest matrix, gitleaks,
+# semgrep, bandit and pip-audit still run in the pipeline. Anything slower than a few
+# seconds belongs there — a slow hook gets uninstalled, and then nothing runs locally.
+#
+# Hook versions are PINNED for the same reason the CI templates are: a hook is code from
+# another repository executed against this checkout.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: "v0.14.1"
+    hooks:
+      # Lint first, then format: the fixer can resolve findings the linter would report.
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      # The registry check runs locally too, because it is the one failure a reviewer cannot
+      # catch by reading the diff: an export added without its row in docs/contracts.md looks
+      # perfectly fine in isolation.
+      - id: contracts-registry
+        name: public API matches docs/contracts.md
+        entry: python -m pytest tests/test_public_api.py -q
+        language: system
+        pass_filenames: false
+        files: ^(src/|docs/contracts\.md$)

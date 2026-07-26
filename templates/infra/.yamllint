@@ -1,0 +1,38 @@
+# yamllint — the first gate a change to this repo passes.
+#
+# The rules are chosen along one axis: STRICT about anything that silently changes MEANING,
+# lenient about anything that is merely style. In an infra repo a YAML quirk is not a
+# cosmetic issue — `key: yes` becomes the boolean True, a duplicate key silently discards the
+# first value, and a tab makes a file parse differently in two tools. Each of those has taken
+# a cluster down somewhere.
+extends: default
+
+ignore: |
+  .venv/
+  .ansible/
+  .git/
+
+rules:
+  # Style, not meaning: long lines in a comment or a long URL in a requirements file are not
+  # worth a red pipeline. Warned, not failed.
+  line-length:
+    max: 120
+    level: warning
+  # Ansible and Kubernetes files both accept either; forcing one only produces churn.
+  document-start: disable
+  # Comment indentation trips over the block-scalar comments used throughout this repo.
+  comments-indentation: disable
+  # THE IMPORTANT ONE. Unquoted yes/no/on/off are booleans in YAML 1.1 (which PyYAML, and
+  # therefore Ansible, still implements). `ansible_become: yes` is fine; a hostname or a
+  # version string that happens to read as `no` is not.
+  truthy:
+    allowed-values: ["true", "false"]
+    check-keys: false
+  # A duplicate key does not error in YAML — the last one silently wins. In a variables file
+  # that is a value someone believes they set and did not.
+  key-duplicates: enable
+  octal-values:
+    # `mode: 0644` is an integer in YAML and Ansible needs a string; this catches the class
+    # of file-permission bugs where 0644 quietly becomes 420.
+    forbid-implicit-octal: true
+    forbid-explicit-octal: false

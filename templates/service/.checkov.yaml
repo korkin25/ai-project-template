@@ -1,0 +1,24 @@
+# Checkov configuration for @@PROJECT@@.
+#
+# Read by BOTH the local pre-commit hook and the CI SAST job (checkov auto-loads
+# .checkov.yaml from the working directory), so a finding cannot be clean locally and red in
+# CI, or vice versa. One skip list, reviewed in one place.
+#
+# EVERY SKIP BELOW IS A CHECK A CHART *TEMPLATE* STRUCTURALLY CANNOT SATISFY — the value it
+# asks for is supplied at package or deploy time by CI, Flux or the platform bundle. That is
+# the only acceptable reason to skip a check here. A skip added because a finding was
+# inconvenient is a security decision made by whoever was in a hurry; take it to
+# docs/architecture.md as a decision instead, and never delete a check silently (the gate
+# policy is: new scanners start soft, then harden — never disappear).
+directory:
+  - .
+compact: true
+quiet: true
+skip-check:
+  - CKV_K8S_14   # image tag not pinned — helm-package.yml writes the real tag at package time
+  - CKV_K8S_15   # imagePullPolicy Always — deployments use immutable CI-built tags on purpose
+  - CKV_K8S_21   # default namespace — the namespace comes from the platform's HelmRelease
+  - CKV_K8S_35   # secrets should be files — shared config arrives via envFrom by convention
+  - CKV_K8S_43   # image not digest-pinned — pinned by CI/Flux at deploy time
+  - CKV2_K8S_6   # no NetworkPolicy — cluster-wide concern owned by the infra repo, not a
+                 # per-service chart (one per service would fight the cluster default)

@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Secrets / local config — NEVER commit. The scanners (gitleaks) are the backstop, not the
+# plan: a secret that reaches a remote branch is compromised even after a force-push, so it
+# must not be committable in the first place. PIP_EXTRA_INDEX_URL in particular carries a
+# token in the URL itself.
+.env
+*.local
+secrets.*
+*.session
+*.key
+*.pem
+.pypirc
+
+# CI reports
+*.test.xml

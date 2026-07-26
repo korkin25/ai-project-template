@@ -1,0 +1,53 @@
+---
+# GitVersion — THE single source of the version for @@PROJECT@@.
+#
+# For a library the version is not decoration: consumers pin it, so the number computed here
+# is the contract's serial number. It is derived from the branch graph plus `next-version`,
+# never typed into pyproject.toml (which declares the version dynamic and lets CI write it).
+#
+# Branch model: feature/* (-alpha) -> dev (-dev) -> rc (-rc) -> release (clean X.Y.Z).
+# There is NO main branch and there are NO git tags — releasing is a MERGE. That is also why
+# the publish job is gated on branches: a tag-gated publish would never fire here, and
+# creating tags would change what GitVersion computes.
+#
+# THE ONE KNOB IS `next-version`. Bump it to cut a new minor or major; patches increment
+# automatically on `release`. Remember what a bump MEANS for a library (docs/contracts.md):
+# a major forces every consumer to spend a branch, so batch breaking changes.
+#
+# Read the current value with:
+#   docker run --rm -v "$PWD:/repo" gittools/gitversion:6.3.0 /repo /showvariable SemVer
+#
+# GitVersion 6.x-NATIVE config. A 5.x-style config makes `next-version` fail to parse on
+# 6.8+ ("Failed to parse X into a Semantic Version"), and there is deliberately NO
+# `tag-prefix`: this repo has no tags for a prefix to match.
+mode: ContinuousDelivery
+next-version: 0.1.0
+
+branches:
+  dev:
+    regex: ^(origin/)?dev(elop)?(ment)?$
+    label: dev
+    increment: Patch
+    is-main-branch: true
+    source-branches: [feature, hotfix]
+  rc:
+    regex: ^(origin/)?rc$
+    label: rc
+    increment: Minor
+    source-branches: [dev]
+  release:
+    regex: ^(origin/)?release$
+    label: ""
+    increment: Patch
+    is-release-branch: true
+    source-branches: [rc, dev]
+  feature:
+    regex: ^(origin/)?features?[-/]
+    label: alpha
+    increment: Inherit
+    source-branches: [dev]
+  hotfix:
+    regex: ^(origin/)?hotfix(es)?[-/]
+    label: hotfix
+    increment: Patch
+    source-branches: [dev, release]

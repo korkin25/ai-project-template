@@ -1,0 +1,31 @@
+# Local gates that mirror CI, so a red pipeline is a surprise rather than a routine.
+#
+# One-time setup per clone:
+#   pip install -e '.[dev]' && pip install pre-commit && pre-commit install
+#
+# These hooks are a fast SUBSET of CI, never a replacement: trivy, gitleaks, semgrep,
+# bandit, pip-audit and the 3.11/3.12 pytest matrix still run in the pipeline. Anything that
+# takes more than a few seconds belongs there, not here — a slow pre-commit hook is
+# uninstalled within a week and then nothing runs locally at all.
+#
+# Hook versions are PINNED (`rev:`) for the same reason the CI templates are: a hook is code
+# from another repository executed against this checkout.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: "v0.14.1"
+    hooks:
+      # Lint first, then format: the fixer can resolve findings the linter would report.
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format
+
+  - repo: https://github.com/bridgecrewio/checkov
+    rev: "3.3.8"
+    hooks:
+      - id: checkov
+        # always_run + pass_filenames: false — checkov reasons about the chart and the
+        # Dockerfile as a whole. Handed only the changed files it silently loses the
+        # cross-resource checks (CKV2_*), which are the ones worth having.
+        always_run: true
+        pass_filenames: false
+        args: ["--config-file", ".checkov.yaml"]

@@ -1,0 +1,25 @@
+# ansible-lint — enforces the infra profile's non-negotiables mechanically.
+#
+# The two rules worth being strict about here are idempotence and pinning. Both are easy to
+# state and easy to violate accidentally, and both fail in a way that only shows up on the
+# SECOND run — which, on infrastructure, is usually during an incident.
+exclude_paths:
+  - .venv/
+  - .ansible/
+  - .git/
+
+# The production profile enforces (among others): every task named, no bare `command`/`shell`
+# where a module exists, no `latest` package/collection versions, handlers used instead of
+# re-running tasks, and FQCNs so a collection change cannot silently re-point a module.
+profile: production
+
+# Rules that are advisory in this repo — listed explicitly rather than left implicit, so the
+# next person can see the decision instead of guessing.
+warn_list:
+  - experimental
+
+# Nothing is skipped by default. Add an entry only with a comment explaining WHY the rule
+# cannot apply here — "it was noisy" is how a repo ends up with the linter switched off one
+# rule at a time.
+# skip_list:
+#   - some-rule  # why it cannot apply

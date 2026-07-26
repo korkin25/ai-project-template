@@ -1,0 +1,144 @@
+---
+# What this platform needs from whatever cluster it is deployed to.
+#
+# This file is a CONTRACT, not documentation. The platform repo declares; an infra repo
+# satisfies. `scripts/check-requirements.py` verifies a live cluster against it, so a
+# missing prerequisite is a named failure before deployment rather than a CrashLoopBackOff
+# an hour later.
+#
+# Keep it in terms of CAPABILITIES, never of implementations. "a secret store reachable as
+# ClusterSecretStore/vault" is a requirement; "deploy HashiCorp Vault with these values" is
+# the infra repo's business and none of ours.
+
+apiVersion: platform.job-agent/v1
+kind: InfrastructureRequirements
+metadata:
+  name: job-agent
+  description: Event-driven job ingestion, matching and auto-apply platform.
+
+cluster:
+  kubernetesVersion: ">=1.31.0"
+  # A default class is required because charts that request storage do not name one.
+  storageClasses:
+    - name: "*default*"
+      reason: Postgres, the message bus and the vector store all request PVCs.
+
+# Controllers that must already be running. Checked by the presence of their CRDs plus at
+# least one Ready pod, because an installed CRD with no controller is the failure mode that
+# looks like success.
+operators:
+  - name: cert-manager
+    resources:
+      - {group: cert-manager.io, kind: Certificate}
+      - {group: cert-manager.io, kind: ClusterIssuer}
+    reason: TLS for anything exposed, and for internal mTLS later.
+    required: true
+
+  - name: external-secrets
+    resources:
+      - {group: external-secrets.io, kind: ExternalSecret}
+      - {group: external-secrets.io, kind: ClusterSecretStore}
+    reason: >-
+      No secret value is ever committed. Every credential is resolved in-cluster from the
+      secret store. Without this, the platform cannot start at all.
+    required: true
+
+  - name: flux-helm
+    resources:
+      - {group: helm.toolkit.fluxcd.io, kind: HelmRelease}
+      - {group: source.toolkit.fluxcd.io, kind: OCIRepository}
+    reason: The bundle is rendered into these; they are how anything gets deployed.
+    required: true
+
+  - name: reloader
+    deployments: [{namespace: reloader, nameContains: reloader}]
+    reason: Restart workloads when a ConfigMap or Secret they consume changes.
+    required: false
+
+  - name: prometheus-operator
+    resources:
+      - {group: monitoring.coreos.com, kind: ServiceMonitor}
+    reason: Service charts ship an opt-in ServiceMonitor; without the CRD it cannot render.
+    required: false
+
+# Named objects the platform's manifests reference by name. A typo here is otherwise only
+# discovered when a secret silently fails to materialise.
+namedResources:
+  - kind: ClusterSecretStore
+    name: vault
+    reason: Every ExternalSecret in the bundle references this store by name.
+    required: true
+
+  - kind: Namespace
+    name: job-agent
+    reason: Every workload is deployed here. Created by the infra repo, not by the bundle.
+    required: true
+
+  - kind: Secret
+    name: gitlab-registry
+    namespaces: [job-agent, flux-system]
+    reason: >-
+      Pulls both the private images and the private OCI charts. Needed in job-agent for the
+      pods and in flux-system for the OCIRepository — a very common half-configuration.
+    required: true
+
+# Data services the application depends on. Declared as capabilities so the infra repo may
+# satisfy them with an operator, a managed service, or a plain chart — the platform does not
+# care, it only needs the endpoint to exist and the credentials to be in the secret store.
+dataServices:
+  - name: postgres
+    capability: PostgreSQL >=16, logical replication enabled (wal_level=logical)
+    reason: >-
+      Primary store. Logical replication is not optional — change data capture streams the
+      write-ahead log into the bus to keep the vector store in sync.
+    credentialsAt: "{vaultPathPrefix}/postgres"
+    required: true
+
+  - name: message-bus
+    capability: Kafka-compatible bus (Redpanda or Kafka), 3 partitions per topic minimum
+    reason: Every inter-service message crosses it. The whole pipeline is asynchronous.
+    credentialsAt: "{vaultPathPrefix}/message-bus"
+    required: true
+
+  - name: vector-store
+    capability: Qdrant, cosine distance, named collections
+    reason: Semantic search over postings and candidate profiles.
+    credentialsAt: "{vaultPathPrefix}/vector-store"
+    required: true
+
+  - name: cache
+    capability: Redis >=7
+    reason: Cursors, rate-limit buckets and chat session state.
+    credentialsAt: "{vaultPathPrefix}/cache"
+    required: false
+
+  - name: cdc
+    capability: Debezium-compatible CDC from PostgreSQL into the message bus
+    reason: Keeps the vector store in sync without the writing service knowing about it.
+    required: false
+
+# Model access. Exactly one of these must be satisfiable; the platform prefers the in-cluster
+# option when it is present and falls back to a hosted API otherwise.
+modelAccess:
+  - name: in-cluster-llm
+    capability: OpenAI-compatible endpoint served from a GPU node
+    nodeRequirements:
+      resources: ["nvidia.com/gpu"]
+    reason: Keeps inference and embeddings local — no data leaves the cluster, no per-token cost.
+    required: false
+
+  - name: hosted-api
+    capability: Anthropic, OpenAI or OpenRouter API reachable from the cluster
+    credentialsAt: "{vaultPathPrefix}/llm"
+    reason: The general case, and the fallback when no GPU node is available.
+    required: false
+
+networking:
+  - name: gateway
+    capability: Gateway API (gateway.networking.k8s.io/v1) with an accepted Gateway to attach to
+    reason: >-
+      Service charts render an HTTPRoute and attach to an existing Gateway via parentRefs;
+      they never render an Ingress and never create a Gateway of their own. Without one the
+      API gateway cannot be reached, so this is a hard requirement of the platform — the CRDs
+      alone are not enough, an accepted Gateway object must exist.
+    required: true

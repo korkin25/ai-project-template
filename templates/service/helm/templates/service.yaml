@@ -1,0 +1,23 @@
+{{- if .Values.service.enabled }}
+# ClusterIP only. Anything that must be reachable from outside the cluster goes through the
+# Gateway (see httproute.yaml): a LoadBalancer or NodePort per service bypasses the
+# gateway's TLS, auth and rate limiting, and it is invisible in the routing config a human
+# reads when asking "what is exposed?".
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "@@PROJECT@@.fullname" . }}
+  labels:
+    {{- include "@@PROJECT@@.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "@@PROJECT@@.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      # By NAME, not by number: the container port can move (a framework default changes,
+      # a sidecar takes 8080) without every consumer of this Service needing an edit.
+      targetPort: http
+      protocol: TCP
+{{- end }}

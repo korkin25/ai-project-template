@@ -1,0 +1,134 @@
+---
+# CI/CD for @@PROJECT@@ — profile: service.
+#
+# WHY THIS FILE IS ALMOST EMPTY.
+# The pipeline is a COMPOSITION of the shared templates in `open_ci_cd/templates`, never a
+# set of inline jobs. Every job in this pipeline arrives through an include; this file only
+# declares *which* templates apply, *what* this repo is called, and *where* its jobs run.
+# New shared CI logic belongs in the templates repo, so every repo gets it at once — a job
+# written here is a private fork of the standard that nobody else benefits from and nobody
+# else fixes when it rots.
+#
+# What the composition buys (see standard/profiles/service.md):
+#   /globals.yml             stages, runner-tag anchors, DOCKERFILE/CHART_PATH defaults,
+#                            change-detection rules, scanner image pins
+#   /auto-semversioning.yml  get_unique_semversion -> GitVersion_SemVer for the whole pipeline
+#   /lint.yml                language gates, self-activating on marker files; Python =>
+#                            ruff + mypy + pytest over 3.11/3.12, plus radon/xenon
+#   /sast.yml                checkov, trivy, gitleaks, semgrep, bandit, pip-audit, hadolint
+#   /docker-build.yml        build + push + cosign signature + SBOM; writes
+#                            .versions/docker-image.env
+#   /helm-package.yml        packages helm/ at the SAME SemVer, pushes to OCI; writes
+#                            .versions/helm-chart.env
+#   /functional.yml          runs auto-tests/group-a/*.sh against the built image
+#   /commit_changes.yml      commits the .versions/*.env files back with [skip ci]
+#
+# NOT included, deliberately:
+#   /docker-sign.yml         DEPRECATED. Signing already happens inside docker-build.yml
+#                            (default_sign). Including it signs the image a second time and
+#                            races the first signature. Do not "restore" it.
+#
+# This pipeline never deploys. It publishes an image and a chart; releasing them into an
+# environment is a separate, reviewed MR in the platform repo that bumps `chartVersion` in
+# that environment's bundle.yaml. A service pipeline that runs `kubectl apply` has taken
+# over a decision it cannot make consistently across environments.
+include:
+  - project: "open_ci_cd/templates"
+    # PINNED TO A TAG — never `ref: "main"`.
+    # These templates are executed code from another repository: whatever `ref` points at
+    # runs with this project's CI_JOB_TOKEN, its registry credentials and its signing key.
+    # On a moving branch a single upstream commit changes every service's pipeline at once,
+    # with no MR, no review and no way to reproduce yesterday's build. Bump this pin in an
+    # MR like any other dependency, and read the templates' CHANGELOG when you do.
+    ref: "@@CI_TEMPLATES_REF@@"
+    file:
+      - "/globals.yml"
+      - "/auto-semversioning.yml"
+      - "/lint.yml"
+      - "/sast.yml"
+      - "/docker-build.yml"
+      - "/helm-package.yml"
+      - "/functional.yml"
+      - "/commit_changes.yml"
+
+variables:
+  # The image name and the chart name are pinned to the canonical hyphenated project name
+  # rather than left to default to ${CI_PROJECT_NAME}. Renaming or transferring the GitLab
+  # project would otherwise silently start publishing a *different* image and a *different*
+  # chart, and every platform bundle pinning the old name would keep deploying the last
+  # build forever without a single error.
+  MODULE_NAME: "@@PROJECT@@"
+  HELM_REPOSITORY: "@@PROJECT@@"
+
+  # DOCKERFILE and CHART_PATH are deliberately NOT set here. This repo uses the canonical
+  # layout (deploy/Dockerfile + helm/), which is exactly what globals.yml already defaults
+  # to. An override that restates the default is a landmine: it survives a change of the
+  # shared default and quietly puts this repo on its own path. A repo that genuinely
+  # deviates sets them AND explains why in docs/architecture.md.
+
+  # Lint/type-check only what this repo authors. The shared default is "." which also drags
+  # in generated and vendored trees; naming the two real source roots keeps ruff/mypy fast
+  # and their findings actionable.
+  PYTHON_LINT_PATHS: "src tests"
+
+  # functional.yml runs the group-(a) scripts inside docker:${DOCKER_VERSION} (Alpine — it
+  # must ship the docker CLI to drive the DinD service). That image has no bash and no curl,
+  # so the job apk-adds this list first. auto-tests/group-a/validate-deploy.sh needs both.
+  FUNCTIONAL_RUNNER_PACKAGES: "bash curl"
+
+  # Mounts the authenticated GitLab PyPI index into `docker build` as a BuildKit secret, so
+  # the image can resolve group-internal packages without the token ever landing in an image
+  # layer or in `docker history`. Harmless when PIP_EXTRA_INDEX_URL is unset: the template
+  # skips empty mappings and deploy/Dockerfile treats a missing secret as "no extra index".
+  DOCKERBUILD_SECRET_pip_index: "PIP_EXTRA_INDEX_URL"
+
+# ---------------------------------------------------------------------------------------
+# Runner tags — READ THIS BEFORE "CLEANING UP" THE FOUR BLOCKS BELOW
+# ---------------------------------------------------------------------------------------
+# globals.yml tags jobs through two anchors, `.default_runner` and `.default_runner_infra`,
+# whose value comes from ${RUNNER_TAG} / ${RUNNER_TAG_INFRA} (default:
+# `saas-linux-small-amd64`, i.e. GitLab.com's shared SaaS runners). Overriding the two
+# anchors here retargets every job that EXTENDS them onto our own fleet. The main file wins
+# over an include and the anchors carry nothing but `tags`, so the override is complete.
+#
+# The subtle part: TWO JOBS NEVER EXTEND EITHER ANCHOR and therefore ship with no tags at
+# all —
+#
+#   get_unique_semversion   (auto-semversioning.yml) — a plain job with no `extends:`
+#   SBOM-cyclonedx-image    (docker-build.yml)       — extends only
+#                                                      .load_image_env_and_resolve + .sbom_rules
+#
+# An untagged job is eligible for ANY runner the project can see, which in practice means it
+# escapes to the SaaS shared runners: it burns paid CI minutes, runs outside our network (so
+# it cannot reach an internal registry), or sits in `pending` forever when the project has no
+# shared-runner entitlement. Overriding `.default_runner` does NOT reach these two — they
+# never extend it — which is exactly why this looks redundant and is not.
+#
+# The shared templates are not ours to patch, and a per-job `tags:` in the main file wins
+# over the include, so overriding both jobs BY NAME here is the correct and complete fix.
+# Deleting either block because "the anchors already handle it" reintroduces the bug, and it
+# is invisible until someone reads the runner column of a green pipeline.
+#
+# The tag must be a LITERAL. GitLab expands variables in `tags`, but not nested references
+# (gitlab-org/gitlab#407129): `tags: [$RUNNER_TAG]` where RUNNER_TAG itself holds `$OTHER`
+# yields the literal string as a tag and the job hangs in `pending` with no matching runner.
+# `job-agent-local` is the group's self-hosted runner, registered by the infra repo. Replace
+# it with your fleet's tag in all four blocks — they must stay in sync.
+.default_runner:
+  tags:
+    - job-agent-local
+
+.default_runner_infra:
+  tags:
+    - job-agent-local
+
+get_unique_semversion:
+  tags:
+    - job-agent-local
+
+SBOM-cyclonedx-image:
+  tags:
+    - job-agent-local
+
+# Project-specific jobs (migrations, extra gates) go below. Think twice: if the job would be
+# useful to a second repo, it belongs in open_ci_cd/templates instead.

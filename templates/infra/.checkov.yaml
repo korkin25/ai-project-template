@@ -1,0 +1,22 @@
+# Checkov configuration for @@PROJECT@@.
+#
+# Read by both the pre-commit hook and the CI SAST job (checkov auto-loads .checkov.yaml from
+# the working directory), so a finding cannot be clean locally and red in CI.
+#
+# In an infra repo checkov is the scanner that matters most: it reads the manifests this repo
+# owns — the ones that create namespaces, operators and RBAC — where a permissive default is
+# not a lint issue but a standing grant of access to everything in the cluster.
+#
+# EVERY SKIP NEEDS A REASON, and "the finding was inconvenient" is not one. A check that does
+# not apply to a bootstrap resource is a decision worth writing in docs/architecture.md.
+directory:
+  - .
+compact: true
+quiet: true
+skip-check:
+  - CKV_K8S_21   # "default namespace" — bootstrap manifests deliberately create namespaces
+                 # and cluster-scoped objects; the check assumes a workload chart
+skip-path:
+  # Rendered or vendored third-party manifests are not this repo's to fix; scanning them
+  # produces findings nobody here can act on, which trains everyone to ignore the report.
+  - vendor/

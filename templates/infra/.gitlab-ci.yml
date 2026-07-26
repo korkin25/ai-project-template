@@ -1,0 +1,207 @@
+---
+# CI/CD for @@PROJECT@@ — profile: infra.
+#
+# ############################################################################
+# THIS PIPELINE LINTS AND VALIDATES. IT NEVER APPLIES ANYTHING.
+# ############################################################################
+#
+# No `ansible-playbook` without --check, no `kubectl apply`, no `helm upgrade`, no `flux
+# reconcile`. Not "not yet" — never. The reasoning, so nobody re-derives it wrongly:
+#
+#   * A pipeline that can apply must HOLD cluster-admin (or root-over-SSH) credentials. Every
+#     job in it, including a third-party linter with a compromised release, then runs with
+#     those credentials. That standing risk is far larger than the manual step it saves.
+#   * Infra changes are the least reversible in the platform: a bad CNI change costs the
+#     cluster, a bad runner change costs CI itself — including the pipeline you would need in
+#     order to fix it.
+#   * "Applying to a cluster always requires explicit human approval, every time" (the infra
+#     profile). Approval to apply once is never approval to apply again, and a pipeline
+#     cannot represent per-run approval.
+#
+# The human workflow this pipeline supports instead: CI proves the change is well-formed, a
+# human runs the plan (`--check --diff`, `helm template`, `flux diff`), reads it, and applies
+# from a workstation. `docs/runbook.md` documents each of those commands.
+include:
+  - project: "open_ci_cd/templates"
+    # PINNED TO A TAG — never `ref: "main"`.
+    # These templates are executed code from another repository running against this repo's
+    # checkout. On a moving branch one upstream commit changes this pipeline with no MR and
+    # no review — in a repo whose entire job is to make infrastructure changes reviewable,
+    # that would be the one unreviewed change in the system.
+    ref: "@@CI_TEMPLATES_REF@@"
+    file:
+      - "/globals.yml"   # stages, runner-tag anchors, tool image pins
+      - "/sast.yml"      # checkov + gitleaks matter most here; the rest self-skip
+
+# NOT included, deliberately:
+#   /auto-semversioning.yml  this repo publishes no artifact, so there is nothing to version.
+#                            A SemVer on applied configuration is a number that describes
+#                            nothing: what is deployed is the state of the cluster, and the
+#                            git commit is already its identifier.
+#   /docker-build.yml, /helm-package.yml, /functional.yml, /commit_changes.yml
+#                            no image, no chart, no artifact to commit back.
+#   /ansible.yml             it ships DEPLOY jobs (see the banner above). Its lint job is
+#                            reproduced below without them. If it is ever adopted, note that
+#                            it expects roles/requirements.yml and collections/requirements.yml
+#                            at the repository root — which is why this scaffold puts them
+#                            there — and its deploy jobs must stay disabled.
+
+variables:
+  # checkov and gitleaks are the two scanners that earn their keep in an infra repo: one
+  # reads the manifests this repo owns, the other stops a bootstrap credential from being
+  # committed "just for a minute".
+  SAST_DISABLED: "false"
+
+  ANSIBLE_ROLE_REQUIREMENTS: "roles/requirements.yml"
+  ANSIBLE_COLLECTION_REQUIREMENTS: "collections/requirements.yml"
+
+# ---------------------------------------------------------------------------------------
+# Runner tags — READ THIS BEFORE "CLEANING UP" THE TWO BLOCKS BELOW
+# ---------------------------------------------------------------------------------------
+# globals.yml tags jobs through two anchors, `.default_runner` and `.default_runner_infra`,
+# whose value comes from ${RUNNER_TAG} / ${RUNNER_TAG_INFRA} (default:
+# `saas-linux-small-amd64`, GitLab.com's shared SaaS runners). Overriding them here retargets
+# every job that EXTENDS them — which, in this pipeline, is every job: the SAST jobs extend
+# `.default_runner_infra`, and the two jobs below extend `.default_runner_infra` explicitly.
+#
+# The service template additionally overrides two jobs BY NAME — `get_unique_semversion`
+# (auto-semversioning.yml) and `SBOM-cyclonedx-image` (docker-build.yml) — because those
+# carry no tags at all and would otherwise escape to the SaaS shared runners. Those blocks
+# are deliberately ABSENT here: neither template is included, so neither job exists, and
+# naming a non-existent job would CREATE one — a job with `tags` and no `script`, which fails
+# the entire config with "jobs:<name> config should implement a script: or trigger: keyword".
+# If this repo ever includes either template, add the matching override at the same time.
+#
+# The tag must be a LITERAL: GitLab expands variables in `tags` but not nested references
+# (gitlab-org/gitlab#407129). `job-agent-local` is the group's self-hosted runner — which
+# THIS repo registers. Chicken-and-egg is real here: before that runner exists, point these
+# at a SaaS tag, bootstrap the runner by hand following docs/runbook.md, then switch back.
+.default_runner:
+  tags:
+    - job-agent-local
+
+.default_runner_infra:
+  tags:
+    - job-agent-local
+
+# ---------------------------------------------------------------------------------------
+# Lint the provisioning code
+# ---------------------------------------------------------------------------------------
+lint_provisioning:
+  stage: validate
+  extends:
+    - .default_runner_infra
+  image:
+    name: "${IAC_BUNDLE_IMAGE}"
+  rules:
+    - if: $NO_LINT_CHECKS == "true"
+      when: never
+    # `exists:` so the job is not created at all in a repo half of whose provisioning is
+    # still a plan. A job that always passes because it found nothing to check is worse than
+    # a missing job: it looks like coverage.
+    - exists:
+        - ansible.cfg
+        - playbooks/*.yml
+      when: always
+  script:
+    - |
+      set -euo pipefail
+
+      # The bundle image normally ships these; installing them on demand keeps the job
+      # working if the image is ever slimmed, instead of failing with "command not found"
+      # in a repo whose pipeline is the only thing standing between a typo and the cluster.
+      for tool in yamllint ansible-lint; do
+        if ! command -v "${tool}" >/dev/null 2>&1; then
+          echo "INFO: ${tool} not present in ${IAC_BUNDLE_IMAGE} — installing it"
+          python3 -m pip install --quiet --disable-pip-version-check "${tool}"
+        fi
+      done
+
+      echo "== yamllint =="
+      # Config in .yamllint; it is intentionally lenient about line length and strict about
+      # the things that silently change MEANING in YAML (duplicate keys, tab indentation,
+      # unquoted "yes"/"no" that Ansible reads as booleans).
+      yamllint .
+
+      echo "== ansible-lint =="
+      # ansible-lint enforces the two properties this repo lives by and a human review
+      # rarely catches: idempotence (no bare `command`/`shell` without a guard) and pinned
+      # versions. Both are non-negotiables in the infra profile.
+      ansible-lint --exclude .ansible --exclude .venv
+
+      echo "== playbook syntax check =="
+      # --syntax-check parses and resolves every playbook, role and include WITHOUT
+      # connecting to a host. It is the closest thing to "does this compile" that Ansible
+      # has, and it catches the undefined role or mistyped module that would otherwise be
+      # discovered halfway through an apply — i.e. with the cluster in a half-changed state.
+      for playbook in playbooks/*.yml; do
+        [ -e "${playbook}" ] || continue
+        echo "-- ${playbook}"
+        ansible-playbook --syntax-check "${playbook}"
+      done
+
+      echo "OK: provisioning code is well-formed. It has NOT been applied — that is a human step."
+
+# ---------------------------------------------------------------------------------------
+# Validate the raw Kubernetes manifests
+# ---------------------------------------------------------------------------------------
+validate_manifests:
+  stage: validate
+  extends:
+    - .default_runner_infra
+  image:
+    name: "${IAC_BUNDLE_IMAGE}"
+  rules:
+    - if: $NO_LINT_CHECKS == "true"
+      when: never
+    - exists:
+        - manifests/**/*.yaml
+      when: always
+  script:
+    - |
+      set -euo pipefail
+
+      # kubeconform validates against the real Kubernetes JSON schemas OFFLINE — no
+      # kubeconfig, no cluster, no credentials in this pipeline (which is the whole point).
+      # `kubectl apply --dry-run=client` is NOT an acceptable substitute: modern kubectl
+      # fetches the OpenAPI schema from an API server, so it needs a live cluster and a
+      # credential to do what kubeconform does from a schema bundle.
+      if command -v kubeconform >/dev/null 2>&1; then
+        echo "== kubeconform =="
+        # -strict rejects unknown fields (a typo'd key is otherwise accepted and silently
+        # ignored by the API server); -ignore-missing-schemas lets CRDs through, since their
+        # schemas live in the cluster they install into.
+        kubeconform -strict -summary -ignore-missing-schemas manifests/
+      else
+        echo "WARN: kubeconform not available in ${IAC_BUNDLE_IMAGE} — falling back to a structural check"
+        # A deliberately small fallback rather than a skip: an unparseable or nameless
+        # manifest must never reach the human who is about to apply it by hand. Add
+        # kubeconform to the bundle image to upgrade this to real schema validation.
+        python3 - <<'PY'
+      import pathlib
+      import sys
+
+      import yaml
+
+      failures = []
+      for path in sorted(pathlib.Path("manifests").rglob("*.yaml")):
+          try:
+              docs = list(yaml.safe_load_all(path.read_text(encoding="utf-8")))
+          except yaml.YAMLError as exc:
+              failures.append(f"{path}: not valid YAML: {exc}")
+              continue
+          for i, doc in enumerate(d for d in docs if d is not None):
+              missing = [k for k in ("apiVersion", "kind") if k not in doc]
+              if missing:
+                  failures.append(f"{path}[{i}]: missing {', '.join(missing)}")
+              elif not (doc.get("metadata") or {}).get("name"):
+                  failures.append(f"{path}[{i}]: {doc['kind']} has no metadata.name")
+
+      for failure in failures:
+          print(f"ERROR: {failure}")
+      print(f"checked manifests/ — {len(failures)} problem(s)")
+      sys.exit(1 if failures else 0)
+      PY
+      fi
+
+      echo "OK: manifests are well-formed. Nothing was applied."

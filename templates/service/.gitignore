@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Secrets / local config — NEVER commit. The scanners (gitleaks) are the backstop, not the
+# plan: a secret that reaches a remote branch is compromised even after a force-push, so it
+# must not be committable in the first place.
+.env
+*.local
+secrets.*
+*.session
+*.key
+*.pem
+
+# CI build products. .versions/*.env is the exception — those ARE committed, because they
+# are the interface between this repo and the platform repo (see .versions/README.md).
+*.tgz
+helm-template-output.yaml
+sbom-*.cdx.json
+*.test.xml
+functional-logs/
+functional-report.json
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store

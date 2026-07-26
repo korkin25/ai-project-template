@@ -1,0 +1,20 @@
+apiVersion: v2
+# Quoted because `@` is a RESERVED YAML indicator: a plain scalar may not start with it, so
+# an unquoted placeholder token makes this file unparseable before substitution — and every
+# YAML linter, pre-commit hook and editor would flag the template itself.
+name: "@@PROJECT@@"
+description: "@@DESCRIPTION@@"
+type: application
+
+# version and appVersion are PLACEHOLDERS. helm-package.yml rewrites both at package time
+# (`yq e -i '.name = env(HELM_REPOSITORY) | .version = env(CHART_VERSION) |
+# .appVersion = env(CI_REGISTRY_IMAGE_TAG)'`), so the published chart always carries the
+# GitVersion SemVer of the commit it was built from — the same number as the image tag.
+#
+# That equality is the whole legibility of the platform:
+#     chart version == image tag == GitVersion_SemVer == one commit
+# Hand-editing either field breaks it: the chart then claims a version that no image
+# corresponds to, and a platform bundle pinning that version deploys something else.
+# Keep them valid SemVer so `helm lint` and `helm template` work locally.
+version: 0.0.0
+appVersion: "0.0.0"

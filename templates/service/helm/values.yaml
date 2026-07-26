@@ -1,0 +1,111 @@
+# Defaults for @@PROJECT@@.
+#
+# THIS FILE CARRIES DEFAULTS ONLY. Per-environment values live in the platform repo
+# (clusters/<cluster>/environments/<env>/values/@@PROJECT@@.yaml) and are merged in by the
+# HelmRelease. The rule that keeps the two from fighting: this chart must render for ANY
+# environment without edits, so nothing here may name a cluster, a domain or a namespace.
+#
+# The chart never templates a secret VALUE. Secrets arrive by reference (`envFrom.secretRef`)
+# to a Secret that already exists in the namespace, provisioned by the secrets operator. A
+# secret rendered by a chart ends up in the release manifest, i.e. in cluster state and in
+# every `helm get values` output.
+
+replicaCount: 1
+
+image:
+  # repository and tag are REWRITTEN by helm-package.yml from the image that this same
+  # pipeline built and pushed. A hand-set image tag in a chart is always a bug: it decouples
+  # the chart version from the code it deploys, and it is invisible until the wrong build
+  # ships. Whatever is written here is only what a local `helm template` shows.
+  repository: registry.gitlab.com/@@GROUP@@/@@PROJECT@@
+  tag: "0.0.0"
+  # IfNotPresent, not Always: deployments reference an immutable, CI-produced tag, so
+  # re-pulling on every restart buys nothing and costs an outage when the registry is down.
+  pullPolicy: IfNotPresent
+
+# The pull secret for registry.gitlab.com. Provisioned in the namespace by the infra repo,
+# referenced here by name only.
+imagePullSecrets:
+  - name: gitlab-registry
+
+nameOverride: ""
+
+# The health server always listens (see src/@@PKG@@/main.py), so a ClusterIP Service is on by
+# default: it is what the httpGet probes, the platform's tier-(d) tests and any sibling
+# service address. A pure worker that must not be addressable at all sets enabled: false —
+# the deployment then falls back to an exec probe.
+service:
+  enabled: true
+  type: ClusterIP
+  port: 8080
+
+probes:
+  path: /health
+  # Generous initialDelay + low failureThreshold on readiness, longer on liveness: readiness
+  # should react fast (it only removes an endpoint), liveness slowly (it kills a container).
+  liveness:
+    initialDelaySeconds: 15
+    periodSeconds: 20
+    failureThreshold: 3
+  readiness:
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    failureThreshold: 3
+
+# Gateway API HTTPRoute — NOT an Ingress. Ingress is frozen upstream; Gateway API is the
+# supported path for anything new, and the cluster's Gateway is owned by the infra repo.
+#
+# Disabled by default because MOST SERVICES EXPOSE NOTHING: a worker that is reachable from
+# the internet by accident is a security incident, and defaults are what people forget to
+# change. Enable it only for a service that genuinely serves external traffic, and set
+# parentRefs to the Gateway the platform provides for that environment.
+httpRoute:
+  enabled: false
+  # Required when enabled — the chart fails rendering with a readable message otherwise,
+  # because an HTTPRoute with no parentRef is silently ignored by the controller (it stays
+  # Accepted=False and nothing routes, with no event on the Deployment).
+  parentRefs: []
+  #  - name: platform-gateway
+  #    namespace: gateway-system
+  #    sectionName: https
+  hostnames: []
+  #  - @@PROJECT@@.example.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+
+# Non-secret configuration, rendered as plain env vars. Anything sensitive belongs in the
+# Secret referenced by envFrom below, never here.
+env: {}
+#  LOG_LEVEL: INFO
+
+# Shared, namespace-wide configuration (broker endpoints, database hosts) and this service's
+# own secret. `optional: true` on both so the pod still starts in an environment where one
+# has not been created yet — a missing ConfigMap otherwise blocks the pod with a
+# CreateContainerConfigError that names no cause.
+envFrom:
+  - configMapRef:
+      name: platform-config
+      optional: true
+  - secretRef:
+      # Quoted: `@` is a reserved YAML indicator and may not open a plain scalar.
+      name: "@@PROJECT@@-secrets"
+      optional: true
+
+# Requests AND limits are set. `resources: {}` is not acceptable for a service on a shared
+# cluster: with no request the scheduler treats the pod as free and packs nodes until
+# something is OOM-killed, and with no limit one leaking pod evicts its neighbours. These
+# numbers are a starting point — measure and adjust per service.
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
