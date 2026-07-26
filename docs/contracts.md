@@ -187,9 +187,19 @@ Distribution manifests, whose names consumers type verbatim:
 /plugin install app@app-marketplace        # .claude-plugin/plugin.json      — "app"
 ```
 
-Renaming either identifier breaks every existing install. (Both files also hardcode
-`version: 0.1.0`, against this standard's own never-hardcode-a-version rule — tracked as
-`PRJ-9`, and a contract change when it is fixed.)
+Renaming either identifier breaks every existing install.
+
+**Neither manifest declares a `version`, deliberately.** The field is optional in both, and
+resolution falls back to the source's git commit SHA — so every commit is a new version and
+installs track the repository. The previous hardcoded `0.1.0` was not only a breach of the
+never-hardcode-a-version rule; it was actively broken, because a pinned version means users
+receive an update *only* when the string is bumped, and every install was therefore frozen at
+`0.1.0` forever. Re-adding a version is the natural instinct and it is the bug.
+
+The end state is CI injecting `GitVersion_SemVer` at package time, which would put the plugin
+under the same one-commit-one-version invariant as the image and the chart. The SHA fallback
+gives per-commit granularity instead of per-release — good enough that this is a follow-up,
+not a blocker.
 
 ### Known consumers
 
@@ -267,6 +277,6 @@ placeholder ends up pinned in production:
 | `src/app/` — the `/health` endpoint, the `app` / `app-serve` commands | a sample service that keeps this repo's own CI green and demonstrates the shape; replaced on adoption |
 | `chart/` values — `ghcr.io/OWNER/REPO`, `tag: ""` | template placeholders; `OWNER/REPO` is not a registry path |
 | `docker-compose.yml` — `image: ghcr.io/OWNER/REPO:latest` | local-run convenience. A version auditor reading this repo flags it as `UNPINNED`; that finding is about a placeholder, not about a deployed image |
-| `.claude-plugin` `version: 0.1.0` | a hardcoded version that should be CI-generated — a defect (`PRJ-9`), not an interface |
+| `.claude-plugin` plugin version | absent on purpose; resolution falls back to the commit SHA. Not an interface, and re-adding it would freeze every install |
 
 Nothing outside this repo may depend on any of them.

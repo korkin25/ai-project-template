@@ -64,6 +64,33 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   The host-agnostic rewrite also reverted an earlier mistake: "GitLab is the only platform a
   repo is required to support" is a project decision that had leaked upstream.
 
+- **The repo's own docs no longer contradict the standard they ship** (`PRJ-6`).
+  `docs/tests.md` described three test tiers where the standard defines four, and pinned tier
+  (a) to one CI host — a tier is defined by *CI runs it unattended*, never by which host.
+  `docs/architecture.md` gained `PRJ-D1`, the ADR for generating `CLAUDE.md` from `standard/`,
+  including why a shared file by URL or submodule was rejected: every agent runtime picks
+  rules up **by name at the repo root**, so the content has to physically be there, and a
+  submodule is unreadable in a shallow clone or an offline sandbox. It also now records the
+  layout deviation the `service` profile permits only when written down, and that the CI-host
+  choice is unsettled. `docs/configuration.md` is host-agnostic, with the one difference that
+  actually bites: GitHub secrets are a separate write-only store, while GitLab has one store
+  where **masking is opt-in** — an unmasked secret is a normal variable that gets echoed the
+  first time something prints the environment, and the log that leaked it is not
+  retroactively redacted.
+- **Stale references removed** (`PRJ-9`). The per-turn hooks recited a context map predating
+  `docs/contracts.md`, `AUTOPILOT-LOG.md` and `standard/`. `README.md` referenced a
+  `docker-compose.voice.yml` and a model PVC inherited from the project this template was
+  extracted from. `chart/values.yaml` claimed no Gateway-API coupling while templating
+  `gateway.networking.k8s.io/v1`; the claim now separates what the chart never couples to from
+  the opt-in CRD-backed resources that are absent-not-degraded when off and a cluster
+  prerequisite when on — a release templating a kind whose CRD is missing fails at apply time,
+  not lint time.
+- **Both plugin manifests stopped declaring a version** (`PRJ-9`). This was not only a breach
+  of never-hardcode-a-version: a pinned version means users receive an update *only* when the
+  string is bumped, so every install was frozen at `0.1.0` forever. The field is optional and
+  resolution falls back to the commit SHA, which is strictly better. Recorded in
+  `docs/contracts.md` so re-adding it — the natural instinct — is recognisable as the bug.
+
 ### Bookkeeping
 
 - `PRJ-13` was a duplicate of `PRJ-8` (observability), created by logging the same requirement

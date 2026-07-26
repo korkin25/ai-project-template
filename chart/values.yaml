@@ -1,6 +1,17 @@
 ---
-# Default values for the generic app chart.
-# Adapted for a portable GitHub/GHCR deployment (no ArgoCD/ESO/GatewayAPI coupling).
+# Default values for the generic app chart. Defaults only — per-environment values live in
+# the platform repo, so this chart must render for any environment and name no registry.
+#
+# No GitOps-controller or secrets-operator coupling: nothing here assumes ArgoCD or an
+# external-secrets operator. The chart never templates a secret value; secrets arrive by
+# reference to an existing Secret (`envFrom.secret`), and whatever applies the release is the
+# platform repo's business, not the chart's.
+#
+# It DOES ship optional CRD-backed resources, all off by default: `gatewayApi` renders a
+# Gateway API HTTPRoute (`gateway.networking.k8s.io/v1`) and `serviceMonitor` a
+# Prometheus-Operator ServiceMonitor. Off means absent, not degraded — but enabling either
+# adds a cluster prerequisite, and a release that templates a kind whose CRD is missing fails
+# at apply time, not at lint time. Check the CRD exists before flipping the flag.
 
 replicaCount: 1
 

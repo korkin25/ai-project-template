@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "printf '%s' 'Reminder: CLAUDE.md is a ROUTER. Before acting, load the task-relevant files from its \"Start here — context map\" (TODO.md, README.md ## Features, docs/tests.md, docs/configuration.md, docs/architecture.md, skills/*/SKILL.md). Keep docs in lockstep in the same change (Documentation-sync table); CI enforces it.'"
+            "command": "printf '%s' 'Reminder: CLAUDE.md is a ROUTER, not the whole spec. Before acting, load what your task maps to in its \"Start here — context map\": TODO.md always; AUTOPILOT-LOG.md when resuming or taking over unfinished work; README.md ## Features + docs/tests.md + docs/configuration.md for a feature/bug; docs/architecture.md for architecture; docs/contracts.md BEFORE touching anything another repo consumes; standard/base.md + standard/profiles/<profile>.md to change a rule — never CLAUDE.md, which is generated; skills/*/SKILL.md for a named skill. Update the matching docs in the SAME change (Documentation-sync table) — CI gates doc-sync and standard-drift.'"
           }
         ]
       }
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "printf '%s' 'This repo follows CLAUDE.md as a router over TODO.md/README.md ## Features/docs/*/skills. Read the \"Start here — context map\" before working; do not work from CLAUDE.md alone.'"
+            "command": "printf '%s' 'This repo follows CLAUDE.md as a ROUTER over TODO.md, AUTOPILOT-LOG.md, README.md ## Features, docs/{architecture,configuration,tests,contracts}.md, standard/ and skills/. Read its \"Start here — context map\" before working; working from CLAUDE.md alone is a bug. CLAUDE.md is GENERATED from standard/base.md + standard/profiles/<profile>.md — edit those and run ./standard/compose.sh, never CLAUDE.md itself.'"
           }
         ]
       }

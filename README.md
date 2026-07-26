@@ -15,12 +15,12 @@ or any Agent-Skills runtime) knows exactly how to work in the repo from `CLAUDE.
 | **Rules (canonical)** | [`CLAUDE.md`](CLAUDE.md) — language, doc-sync, testing policy, build/CI, per-task lifecycle; [`AGENTS.md`](AGENTS.md) — pointer + Agent-Skills portability |
 | **Features & history** | [`## Features`](#features) (user-facing feature list — what this README renders on the Marketplace/PyPI page), [`TODO.md`](TODO.md) (open work + backlog/ideas), [`CHANGELOG.md`](CHANGELOG.md) |
 | **Docs** | [`docs/configuration.md`](docs/configuration.md) (env-var reference), [`docs/tests.md`](docs/tests.md) (per-feature test catalog) |
-| **Tests** | [`auto-tests/`](auto-tests/) — group-a (automated/CI) · group-b (dev-machine/sandbox) · group-c (human-in-the-loop) |
+| **Tests** | [`auto-tests/`](auto-tests/) — group-a (automated/CI) · group-b (dev-machine/sandbox) · group-c (human-in-the-loop). Tier-(d), cross-service end-to-end, lives in the platform repo — see [`docs/tests.md`](docs/tests.md) |
 | **CI (GitHub)** | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — **composition-only**: every job comes from the public reusable workflows in [`korkin25/open-ci-actions@v1`](https://github.com/korkin25/open-ci-actions) (detect → python / sast / docker → GHCR / helm / functional / release). The file is wiring + inputs; new shared jobs belong in open-ci-actions |
 | **CI (GitLab mirror)** | [`.gitlab-ci.yml`](.gitlab-ci.yml) — **include-only**: every job comes from the shared `open_ci_cd/templates` (python gates, image → Container Registry, chart → Package Registry, functional, and SAST: checkov/trivy/gitleaks/semgrep/bandit/pip-audit/hadolint). The file holds nothing but `include:` + variable overrides |
-| **Container** | [`Dockerfile`](Dockerfile) (multi-stage, non-root), [`docker-compose.yml`](docker-compose.yml) + [`docker-compose.voice.yml`](docker-compose.voice.yml) |
-| **Deploy** | [`chart/`](chart/) — generic Helm chart (Deployment + optional PVC/model-PVC), published as an OCI chart to GHCR |
-| **Skills** | [`skills/`](skills/) — portable `SKILL.md` template + authoring guide; [`.claude-plugin/`](.claude-plugin/) — marketplace/plugin manifests |
+| **Container** | [`Dockerfile`](Dockerfile) (multi-stage, non-root), [`docker-compose.yml`](docker-compose.yml) |
+| **Deploy** | [`chart/`](chart/) — generic Helm chart (Deployment + Service, plus opt-in PVC, Gateway API HTTPRoute, ServiceMonitor, HPA and PDB), published as an OCI chart at the same version as the image |
+| **Skills** | [`skills/`](skills/) — portable `SKILL.md` template + authoring guide; [`.claude-plugin/`](.claude-plugin/) — marketplace/plugin manifests. Neither manifest declares a `version`: Claude Code falls back to the source's git commit SHA, which keeps the never-hardcode-a-version rule intact — do not add one back |
 | **Multi-agent pickup** | `CLAUDE.md` is the one rulebook; `AGENTS.md`, `GEMINI.md`, `.cursorrules`, `.clinerules`, `.windsurfrules`, `.github/copilot-instructions.md` symlink to it, `.cursor/rules/*.mdc` points to it — Codex/Cursor/Copilot/Gemini/Cline/Windsurf all load the same rules |
 | **Stay-in-context** | a `CLAUDE.md` router ("context map"), a per-turn reminder hook (`.claude/settings.json`), and a CI `doc-sync` guard so agents don't forget the docs/tests/skills |
 | **Community & security** | `LICENSE`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`, `.github/` (CODEOWNERS, dependabot, issue/PR templates), `.pre-commit-config.yaml` (gitleaks via Docker), `.editorconfig`, `Makefile` |
@@ -38,11 +38,13 @@ it with your real code.
    `TODO.md`.
 3. **Language.** `CLAUDE.md` sets repo content = English, live chat = your working language
    (default here: Russian). Change the chat language if needed.
-4. **Trim what you don't use.** No Telegram/voice? Drop `docker-compose.voice.yml` and the
-   `voiceModel` PVC from the chart. No k8s? Drop `chart/`. No container? Drop `Dockerfile`
-   + the image/chart CI jobs.
-5. **CI env.** Create the `ci-functional` GitHub Actions environment and add any secrets
-   your functional tests need (see `docs/configuration.md`).
+4. **Trim what you don't use.** No k8s? Drop `chart/`. No container? Drop `Dockerfile`,
+   `docker-compose.yml` and the image/chart CI jobs. Everything optional in the chart
+   (`persistence`, `gatewayApi`, `serviceMonitor`, `autoscaling`, `podDisruptionBudget`) is
+   already off by default — enable what you need rather than deleting what you don't.
+5. **CI env.** Create the `ci-functional` variable scope on your CI host and add any variables
+   and secrets your functional tests need. The concept is host-agnostic; the mechanics for
+   both GitLab and GitHub are in `docs/configuration.md`.
 6. **GitLab mirror (optional).** `.gitlab-ci.yml` is **include-only** — it pulls every job
    from the shared `open_ci_cd/templates` and publishes the image to the GitLab Container
    Registry and the chart to the Package Registry. Keep it that way: new jobs belong in the
@@ -59,11 +61,12 @@ it with your real code.
 
 Every task follows a **per-task lifecycle** (log → backlog → test-plan → branch → TDD →
 verify → record → PR). Docs stay in lockstep with code **in the same change**
-(doc-sync table). Tests are split into three groups (automated / dev-sandbox / human) and a
-task is "done" only when 100% tested. CI is the single release pipeline: it gates on
-quality (radon/xenon) and security (bandit/pip-audit/semgrep/checkov/hadolint/trivy) and
-publishes the image + Helm chart to GHCR. The agent develops **continuously** and consults
-a human only on architectural decisions.
+(doc-sync table). Tests are split into four tiers (automated / dev-sandbox / human /
+cross-service e2e, the last owned by the platform repo) and a task is "done" only when 100%
+tested. CI is the single release pipeline: it gates on quality (radon/xenon) and security
+(bandit/pip-audit/semgrep/checkov/hadolint/trivy) and publishes the image + Helm chart at one
+version to the registry the chosen CI host provides. The agent develops **continuously** and
+consults a human only on architectural decisions.
 
 ## Features
 

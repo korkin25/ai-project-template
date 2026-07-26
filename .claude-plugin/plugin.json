@@ -1,7 +1,6 @@
 {
   "name": "app",
-  "description": "Template: bundles this project's Agent Skills. Replace name/description and list your skills.",
-  "version": "0.1.0",
+  "description": "Template: bundles this project's Agent Skills. Replace name/description and list your skills. No version field on purpose — Claude Code falls back to the source git commit SHA, so the version is never hand-written.",
   "author": {
     "name": "you",
     "url": "https://github.com/OWNER"
