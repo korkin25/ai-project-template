@@ -470,8 +470,29 @@ This project is developed by an AI agent under continuous, autonomous iteration.
 - Feature branches: work on `feature/@@PREFIX@@-<n>-<slug>` off `dev`; merge to `dev` only
   when the full suite is green. Promote `dev` → `rc` → `release` by merging forward.
 - Commit periodically in small logical units, Conventional Commits (`feat:`, `fix:`, `test:`,
-  `docs:`, `chore:`, `ci:`). Never add a Co-Authored-By trailer. Push to `origin` after every
-  commit.
+  `docs:`, `chore:`, `ci:`). Push to `origin` after every commit.
+
+### Commit messages carry no agent attribution — this one is absolute
+
+**Never add a `Co-Authored-By` trailer, a `Claude-Session` link, or any other marker naming
+the tool that produced a commit.** Not on any branch, not in any repository, not "just this
+once" because a harness default added it.
+
+A commit's authorship is a statement about a person who is accountable for the change. An
+agent is not a co-author; it is an instrument, like an editor or a compiler, and listing it
+conflates the two in the one record that outlives every conversation about it. The trailer
+also leaks tooling choices into a permanent, public artefact that reviewers, downstream
+forks and release notes all inherit — a session URL in particular is noise to everyone except
+the session that is already gone.
+
+**If a tool adds it by default, turn the default off.** A rule that relies on an agent
+remembering to delete a line it did not write is a rule that fails on the first tired run;
+this one is enforced at the tool, not in review. Where the default cannot be turned off, the
+commit is amended before it is pushed.
+
+If a trailer is found in unpushed history, strip it. If it is found in **pushed** history,
+say so and stop: rewriting shared history is a force-push and needs explicit approval, and
+the cure must not be worse than the defect.
 - Versions are **auto-generated** by GitVersion — never hardcode a version.
 - Security first: no secrets in git; least privilege; treat any token/session as a
   full-access credential.
