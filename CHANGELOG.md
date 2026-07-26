@@ -41,6 +41,22 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   authoritative and is wrong, and the failure is specific: the work finishes, the code and the
   changelog are perfect, and every ticket still reads `⬜`, so the next session re-derives what
   was already done or redoes it.
+- **`GET /metrics` is registered as a contract in the `service` scaffold** (`PRJ-20`).
+  `templates/service/docs/contracts.md` listed `/health` and not `/metrics`, while the
+  scaffold served the endpoint, the chart scraped it through a `ServiceMonitor` and the
+  tier-(a) script probed it — so the one file a consumer reads *instead of* the source omitted
+  the endpoint an operator's Prometheus actually depends on. The row records the response
+  shape and the exposition `Content-Type`; the metric names are deliberately not pinned,
+  because adding a series is additive while the endpoint, its port and its format are what
+  anyone builds on.
+- **Tier-(a) tests for `/metrics` in the `service` scaffold** (`PRJ-21`), three of them: the
+  endpoint answers `200` with the exposition `Content-Type` and a body carrying a `# TYPE`
+  line; `/health` and `/metrics` report one version; and the counters move with the worker.
+  Asserted over HTTP on an ephemeral port rather than against the renderer, because the header
+  a scraper depends on comes from the handler — a renderer-only test stays green while the
+  endpoint answers with something Prometheus marks UP and stores nothing from. Shape, never an
+  exact payload: the reasoning is copied from `auto-tests/group-a/validate-deploy.sh`, which
+  already asserts the same invariant one level up.
 
 ### Fixed
 
@@ -104,6 +120,20 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   service repo instead. Verified by simulating adoption end to end.
 - **The canonical layout** (`PRJ-5`) — `deploy/Dockerfile` and `helm/`, which deleted both CI
   overrides since the canon is what the shared templates already default to.
+- **The `service` chart no longer names a registry** (`PRJ-22`). `templates/service/helm/values.yaml`
+  shipped `registry.gitlab.com/@@GROUP@@/@@PROJECT@@` and an `imagePullSecrets[0].name` of
+  `gitlab-registry` — one host hardcoded into a scaffold the standard requires to be
+  host-agnostic, and inherited unchanged by every repo spawned from it. Both are now
+  `@@REGISTRY@@` and `@@PULL_SECRET@@`, using the scaffold-instantiation mechanism already
+  documented next to `@@CI_TEMPLATES_PROJECT@@`, `@@CI_TEMPLATES_REF@@` and `@@RUNNER_TAG@@`:
+  tokens that live only under `templates/`, are substituted by whoever creates the repo, and
+  are caught by that scaffold's own `grep -rnE '@{2}' .` gate. Neither became a `repo.env`
+  key, deliberately — `compose.sh` writes `CLAUDE.md` and nothing else, so the key would be
+  read by nobody while implying the generator resolves it, and a new required key breaks every
+  existing `repo.env` at once. Both values are quoted, because `@` is a reserved YAML indicator
+  and may not open a plain scalar. Verified by instantiating the scaffold twice, once per host:
+  `helm lint` clean and `helm template` rendering `ghcr.io/…` with one pull secret and
+  `registry.gitlab.com/…` with the other.
 
 ### Bookkeeping
 
