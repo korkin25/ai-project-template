@@ -12,10 +12,12 @@ drift). "Applied successfully" does not close a task here.
 Keep this block accurate: it is the cold-start entry point, and in an infra repo it is often
 read during an incident.
 
-- **State:** scaffolded from the `infra` template; nothing provisioned yet.
-- **Next action:** substitute the scaffold placeholders, run `./standard/compose.sh`, fill in
-  the real inventory, then walk `docs/runbook.md` on a throwaway environment — following it
-  is how you find out what it is missing.
+- **State:** scaffolded from the `infra` template; the GitOps tree is empty and nothing is
+  reconciled yet.
+- **Next action:** substitute the scaffold placeholders, run `./standard/compose.sh`, rename
+  `clusters/<cluster>/` to the real cluster and list only the components it actually runs,
+  then write the machine-layer bootstrap into `docs/runbook.md` and walk that runbook on a
+  throwaway environment — following it is how you find out what it is missing.
 
 ## Legend
 
@@ -35,12 +37,17 @@ so the prefix must be unique across the group. Cross-repo work also carries a pl
 |---|---|---|---|
 | _none_ | | | |
 
-## Awaiting a human apply
+## Awaiting reconciliation, or a human step
 
-Changes that are merged and **planned** but not yet applied. This table is the reason the
-distinction matters: in every other repo "merged" means "live", and here it does not.
+Two kinds of change land here, and both are cases where "merged" is not yet "true of the
+cluster":
 
-| Id | Change | Plan reviewed | Applied by / when |
+- **Merged, not yet converged.** The reconciler applies on its own schedule and can fail
+  while doing so. A change is closed when the read-back says so, not when the MR does.
+- **Waiting on a human step** — anything in the machine layer or the bootstrap prefix
+  (`docs/configuration.md`), which no merge can perform.
+
+| Id | Change | Plan reviewed | Converged / applied — read-back |
 |---|---|---|---|
 | _none_ | | | |
 

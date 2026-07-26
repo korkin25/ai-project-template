@@ -11,17 +11,19 @@ nothing, sometimes something specific.
 
 There are no released versions here: this repo publishes no artifact, and what is "deployed"
 is the state of the cluster. Entries are therefore grouped by the date the change was
-**applied**, not by a version number — a merged-but-unapplied change stays in `TODO.md`
-under *Awaiting a human apply*.
+**observed in the cluster**, not by a version number and not by the merge date — merging
+starts the reconcile, and a reconcile can fail. Until the state has been read back, the change
+stays in `TODO.md` under *Awaiting reconciliation, or a human step*.
 
 ## [Unreleased]
 
 ### Added
 
-- Repository scaffolded from the shared `infra` template: lint/validate-only GitLab CI
-  pinned to a tagged `open_ci_cd/templates`, Ansible layout with exactly pinned collections
-  and roles, `manifests/` for cluster prerequisites, and the full doc set including
-  `docs/runbook.md`.
+- Repository scaffolded from the shared `infra` template: lint/validate-only GitLab CI pinned
+  to `@@CI_TEMPLATES_PROJECT@@` at `@@CI_TEMPLATES_REF@@`, a Flux/kustomize GitOps tree
+  (`clusters/` sync roots, `apps/` components, `repositories/` sources) with every chart and
+  image at an exact version, `manifests/` for cluster prerequisites, and the full doc set
+  including `docs/runbook.md`.
 
 ### Changed
 
