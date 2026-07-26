@@ -68,6 +68,26 @@ def semantic_checks(path: Path, bundle: dict[str, Any]) -> list[str]:
             if candidate.stem not in declared:
                 problems.append(f"{candidate} is not referenced by any entry in the bundle — dead file")
 
+    # The pull secret is declared twice because it is used by two different clients, and
+    # nothing else notices when the two drift apart. `imagePullSecret` in the bundle is what
+    # render.py injects into the Flux OCIRepository, so Flux can pull the CHART;
+    # `imagePullSecrets` in values/common.yaml lands on the pod spec, so the kubelet can pull
+    # the IMAGE. A mismatch fails asymmetrically and reads badly: the Kustomization reconciles
+    # green while pods sit in ImagePullBackOff, or the chart never fetches at all and no pod
+    # exists to look at. Both are minutes of confusion that this one comparison removes.
+    common = values_dir / "common.yaml"
+    declared_secret = bundle.get("imagePullSecret")
+    if declared_secret and common.is_file():
+        common_values = load_yaml(common) or {}
+        entries = common_values.get("imagePullSecrets") or []
+        names = [e.get("name") for e in entries if isinstance(e, dict)]
+        if names and declared_secret not in names:
+            problems.append(
+                f"imagePullSecret {declared_secret!r} in the bundle is not among "
+                f"{names!r} in {common} — Flux would pull the chart with one Secret and the "
+                f"kubelet the image with another"
+            )
+
     # The directory name is part of the promotion workflow; a mismatch makes "copy the version
     # from dev to stage" land in the wrong place.
     if bundle.get("name") and env_dir.name not in bundle["name"]:

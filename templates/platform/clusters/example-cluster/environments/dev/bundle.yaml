@@ -14,7 +14,22 @@ imageRegistry: <registry>/<group>
 vaultPathPrefix: dev
 # Provisioned by the infra repo into BOTH this namespace and flux-system, rendered from the
 # secret store by an ExternalSecret. Not created here.
-imagePullSecret: gitlab-registry
+#
+# A placeholder, like `imageRegistry` above, for two independent reasons.
+#
+# 1. The previous literal was `gitlab-registry`, which hardcodes one CI host into a scaffold
+#    the standard requires to be host-agnostic. An adopter on another host would inherit a
+#    name that describes somebody else's registry.
+# 2. It also silenced a checkov false positive. `CKV_SECRET_6` (Base64 High Entropy String)
+#    fires on the *name* of a Kubernetes Secret, because an entropy detector cannot tell a
+#    reference from a payload. Note what does NOT fix it, all measured rather than assumed:
+#    quoting the value (single or double) changes nothing, since the check runs on the parsed
+#    string; an inline `# checkov:skip=CKV_SECRET_6:` comment is ignored, because the secrets
+#    framework does not honour inline suppressions the way the IaC frameworks do; and adding
+#    the id to `skip-check` in `.checkov.yaml` would disable it repo-wide, which is the one
+#    outcome worth avoiding — a real base64 blob committed into a bundle is precisely the
+#    mistake this scan exists to catch.
+imagePullSecret: <image-pull-secret>
 interval: 30m
 
 microservices:

@@ -1,7 +1,14 @@
 ---
 # Applied to every chart in this environment, before the per-component file.
+#
+# Keep this name identical to `imagePullSecret` in bundle.yaml. They are two views of one
+# Secret: the bundle field is what `render.py` injects into the Flux `OCIRepository` so Flux
+# can pull the CHART, and this value is what the chart puts on the pod spec so the kubelet can
+# pull the IMAGE. Nothing enforces that they agree, and when they drift the failure is
+# asymmetric and slow to read — the chart reconciles fine and the pod sits in
+# ImagePullBackOff, or the reverse.
 imagePullSecrets:
-  - name: gitlab-registry
+  - name: <image-pull-secret>
 resources:
   requests: {cpu: 50m, memory: 128Mi}
   limits: {cpu: 500m, memory: 512Mi}
