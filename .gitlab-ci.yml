@@ -37,10 +37,18 @@ variables:
   PYTHON_LINT_PATHS: "src"
   BANDIT_TARGET: "src"
 
-  # Functional smoke test: nothing to set. /functional.yml is script-driven — it discovers
-  # auto-tests/group-a/*.sh from FUNCTIONAL_TESTS_DIR/FUNCTIONAL_TESTS_GLOB, which globals.yml
-  # already defaults to this layout, and the port lives in the script itself
-  # (auto-tests/group-a/validate-deploy.sh reads APP_PORT, default 8080).
+  # Functional smoke test: discovery needs nothing. /functional.yml finds
+  # auto-tests/group-a/*.sh via FUNCTIONAL_TESTS_DIR/FUNCTIONAL_TESTS_GLOB, both already
+  # defaulted to this layout in globals.yml, and the port lives in the script itself
+  # (validate-deploy.sh reads APP_PORT, default 8080).
+  #
+  # The runner image DOES need one addition. It is `docker:*`, which ships neither curl nor
+  # wget, and the default package list is just `bash`. Without curl the health probe fails
+  # every iteration for thirty seconds and looks exactly like a service that never started —
+  # which is how it was first diagnosed here, wrongly, as a networking problem. The script now
+  # also refuses to run when no probe tool is present, so this variable and that check are
+  # belt and braces on the same silent failure.
+  FUNCTIONAL_RUNNER_PACKAGES: "bash curl"
 
   # Runner: globals.yml defaults to GitLab.com shared runners. Uncomment to use a private
   # fleet — the value must be a literal tag, never a reference to another variable.

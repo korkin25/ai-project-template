@@ -72,10 +72,25 @@ docker run -d --name "${CONTAINER}" \
   -p "${PORT}:8080" \
   "${IMAGE}" >/dev/null
 
+# Pick the probe tool BEFORE the loop, and fail loudly if there is none. The loop discards
+# stderr — it has to, or thirty connection-refused messages bury the real output — which means
+# a missing tool looks exactly like a service that never came up: thirty silent seconds and a
+# timeout. That cost a full CI debugging cycle here. The runner image is `docker:*`, which
+# ships neither curl nor wget unless FUNCTIONAL_RUNNER_PACKAGES asks for them.
+if command -v curl >/dev/null 2>&1; then
+  probe() { curl -fsS "$1" 2>/dev/null; }
+elif command -v wget >/dev/null 2>&1; then
+  probe() { wget -qO- "$1" 2>/dev/null; }
+else
+  echo "FAIL: neither curl nor wget is available — the probe cannot run"
+  echo "HINT: under GitLab CI add them to FUNCTIONAL_RUNNER_PACKAGES in .gitlab-ci.yml"
+  exit 1
+fi
+
 echo "== probe http://${HOST}:${PORT}/health =="
 body=""
 for _ in $(seq 1 30); do
-  if body="$(curl -fsS "http://${HOST}:${PORT}/health" 2>/dev/null)"; then
+  if body="$(probe "http://${HOST}:${PORT}/health")" && [ -n "${body}" ]; then
     break
   fi
   body=""

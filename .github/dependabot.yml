@@ -1,6 +1,15 @@
 # Low-noise policy: one grouped PR per ecosystem, weekly, and never a breaking major
 # (major bumps need a deliberate migration as their own task, not a red auto-PR).
 # Minor/patch only.
+#
+# The GitLab counterpart is `renovate.json` at the repo root — the same policy in Renovate's
+# vocabulary, plus the two dependencies Dependabot cannot see at all (the `.gitlab-ci.yml`
+# `include:` ref and the tool versions pinned inside `.pre-commit-config.yaml`).
+#
+# A project supports EXACTLY ONE host, recorded in `docs/architecture.md`. Once this repo
+# settles that question, DELETE the file for the host that lost: two dependency bots against
+# one repository is two sets of MRs, two label conventions and two policies to keep in step,
+# and the second one is maintained right up until the week it matters.
 version: 2
 updates:
   - package-ecosystem: "pip"

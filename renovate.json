@@ -1,0 +1,77 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": [
+    "Dependency policy for the GitLab side of this standard — the counterpart of .github/dependabot.yml, and the bot the host table in standard/profiles/service.md names for GitLab. A project supports exactly one host, so on any given repo one of the two files is dead weight; delete the one for the host you did not pick rather than leaving a bot config that describes a policy nobody runs.",
+    "The policy it reproduces, unchanged: one grouped MR per ecosystem, weekly, at most five open at a time, labelled, and never a breaking major opened by a machine. A major bump is a migration with its own ticket, not a red MR that sits there teaching everyone that this bot's MRs are usually broken.",
+    "JSON has no comments, so every 'why' in this file lives in a description field. Renovate reads them and ignores them; a reader gets the reasoning at the point of the rule instead of in a wiki nobody opens. Keep them when you edit the rule — a rule whose reason was deleted is a rule the next person deletes.",
+    "SOMETHING HAS TO RUN RENOVATE. Unlike Dependabot there is no host-side switch on GitLab: this file is inert until a runner executes Renovate against this project — a scheduled pipeline in a group-level renovate-runner project, or a self-hosted instance. A renovate.json in a repo nothing scans is the most convincing kind of dead control, because it is syntactically perfect."
+  ],
+  "extends": ["config:recommended"],
+  "timezone": "Etc/UTC",
+  "schedule": ["before 6am on monday"],
+  "baseBranches": ["dev"],
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 0,
+  "labels": ["dependencies"],
+  "dependencyDashboard": true,
+  "semanticCommits": "enabled",
+  "minimumReleaseAge": "3 days",
+  "pre-commit": {
+    "enabled": true
+  },
+  "packageRules": [
+    {
+      "description": "pip -> one grouped MR for everything the Python packaging metadata declares. dependabot.yml grouped patterns ['*'] for update-types minor+patch; the equivalent here is one groupName across every Python manager, with majors peeled off by the last rule in this list. All the Python managers are listed rather than just pep621: the day someone adds a requirements file or a lockfile, it joins the same MR instead of silently starting a second one.",
+      "matchManagers": ["pep621", "pip_requirements", "pip-compile", "poetry", "pipenv"],
+      "groupName": "python dependencies"
+    },
+    {
+      "description": "github-actions -> one grouped MR, labelled 'ci' as in dependabot.yml. Kept on a GitLab-first repo on purpose while .github/workflows/ still exists: an unpinned action is a supply-chain hole regardless of which pipeline is the authoritative one. On a repo that has genuinely settled on GitLab this manager finds nothing and costs nothing.",
+      "matchManagers": ["github-actions"],
+      "groupName": "github actions",
+      "addLabels": ["ci"]
+    },
+    {
+      "description": "docker -> one grouped MR, labelled 'docker' as in dependabot.yml. Covers deploy/Dockerfile (including the FROM python:${PYTHON_VERSION} built from an ARG default) and docker-compose.yml.",
+      "matchManagers": ["dockerfile", "docker-compose"],
+      "groupName": "docker images",
+      "addLabels": ["docker"]
+    },
+    {
+      "description": "THE FIRST THING DEPENDABOT COULD NOT SEE: the .gitlab-ci.yml include: ref. Those templates are executed code from another repository running with this project's job token, registry credentials and signing key — the single most privileged dependency this repo has, and the only one that had no bot watching it. Renovate's gitlabci-include manager bumps `ref:` when it points at a TAG; while it points at a moving branch there is no version to compare and this rule is correctly silent. That silence is the argument for pinning a tag, not evidence the manager is broken.",
+      "matchManagers": ["gitlabci", "gitlabci-include"],
+      "groupName": "gitlab ci templates",
+      "addLabels": ["ci"]
+    },
+    {
+      "description": "templates/ is excluded from the CI managers only. The scaffolds carry @@CI_TEMPLATES_PROJECT@@ / @@CI_TEMPLATES_REF@@ placeholders, which are not resolvable project paths — Renovate would log an unlookupable dependency on every run, and a log full of expected warnings is a log nobody reads. Their pre-commit and Docker pins are NOT excluded: those are real versions, they ship verbatim into every spawned repo, and a stale scaffold pin becomes a stale pin in every repository created after it.",
+      "matchManagers": ["gitlabci", "gitlabci-include"],
+      "matchFileNames": ["templates/**"],
+      "enabled": false
+    },
+    {
+      "description": "THE SECOND THING DEPENDABOT COULD NOT SEE: tool versions pinned inside .pre-commit-config.yaml. A hook is code from another repository executed against this checkout before anything reviews it, which makes it a dependency by every definition that matters. Two shapes exist here and both are covered — the ordinary `repo:` + `rev:` pins in the scaffolds (built-in pre-commit manager, which Renovate leaves DISABLED by default; see the top-level pre-commit block), and this repo's own `repo: local` + `language: docker_image` hook, which no built-in manager can see at all and which the customManager below picks up.",
+      "matchManagers": ["pre-commit", "custom.regex"],
+      "groupName": "pre-commit hooks",
+      "addLabels": ["ci"]
+    },
+    {
+      "description": "MAJORS: never an automatic MR. This is dependabot.yml's `ignore: version-update:semver-major` translated into the one thing Renovate can do that Dependabot could not — the literal translation is `enabled: false`, and it is worse. An ignored major is INVISIBLE: nothing tells you the pin is two majors behind until the day the version you are on stops receiving fixes. Dashboard approval keeps the exact behaviour that was wanted (no machine opens a breaking MR) while leaving every pending major listed on the Dependency Dashboard issue, where ticking a box is what asks for the MR. The migration is still a ticket with its own tests; this only makes sure you know it is owed.",
+      "matchUpdateTypes": ["major"],
+      "groupName": "major updates — needs a migration ticket",
+      "addLabels": ["major"],
+      "dependencyDashboardApproval": true
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "This repo pins gitleaks as a Docker image inside a `repo: local` pre-commit hook (`entry: zricethezav/gitleaks:v8.30.1 …`). No built-in manager parses hook entry lines, so without this the one security tool that runs on every developer's machine was the one dependency nothing tracked. The pattern is deliberately narrow — an entry line whose first token is image:tag — so a hook whose entry is a plain command is left alone rather than half-parsed into a nonsense dependency.",
+      "managerFilePatterns": ["/(^|/)\\.pre-commit-config\\.yaml$/"],
+      "matchStrings": [
+        "entry:\\s+(?<depName>[a-z0-9]+(?:[._-][a-z0-9]+)*(?:\\/[a-z0-9]+(?:[._-][a-z0-9]+)*)+):(?<currentValue>v?\\d[^\\s\"']*)"
+      ],
+      "datasourceTemplate": "docker"
+    }
+  ]
+}

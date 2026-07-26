@@ -1,0 +1,113 @@
+# Code owners — GITLAB dialect. The GitHub twin is `.github/CODEOWNERS`; the two files say
+# the same thing in two syntaxes, and only one host ever reads each. A project supports
+# exactly one host (see `docs/architecture.md`), so on any given repo one of these two files
+# is dead weight — delete it rather than leaving it to rot into a lie about who reviews what.
+#
+# Template: replace `@OWNER` with your user or group. Read the note on `[…][2]` first.
+#
+# ---------------------------------------------------------------------------------------
+# WHY THIS FILE LIVES IN `.gitlab/` AND NOT AT THE REPO ROOT
+# ---------------------------------------------------------------------------------------
+# GitLab accepts CODEOWNERS in three places — the repo root, `docs/`, and `.gitlab/` — and
+# uses the first one it finds. Keeping exactly one, here, is deliberate:
+#
+#   * The ROOT is shared ground. GitHub reads a root `CODEOWNERS` too, and GitHub's parser
+#     has no concept of `^[Section]` or `[Section][2]`: it flags those lines as syntax
+#     errors and the paths listed under them are guarded by nothing. A file that is silently
+#     inert on the other host is worse than no file, because the settings page keeps showing
+#     it and everyone assumes the paths are covered.
+#   * `docs/` is actively harmful HERE, specifically. The `doc-sync` gate counts any change
+#     under `docs/` as "documentation was updated". Put the ownership rules there and an MR
+#     that changes nothing but who may approve what would satisfy the gate — a governance
+#     change buying itself an exemption from the governance check.
+#   * `.gitlab/` already holds `merge_request_templates/`. One host, one directory, mirroring
+#     `.github/` — the path alone answers "which host is this for?".
+#
+# ---------------------------------------------------------------------------------------
+# WHAT ACTUALLY MAKES THIS BINDING (two switches, both outside this file)
+# ---------------------------------------------------------------------------------------
+#   1. Code Owners is a PREMIUM/ULTIMATE feature. On Free the file parses and renders, and
+#      approvals are not enforced. A Free project gets a document, not a control.
+#   2. Even on Premium, code-owner approval is only REQUIRED when the protected branch says
+#      so: `code_owner_approval_required=true`, set per branch. See
+#      `docs/configuration.md` § "Branch protection". Without it this file merely *suggests*
+#      reviewers, which is the failure mode worth naming out loud — the rules look enforced,
+#      the merge button stays green, and nobody discovers the difference until the review
+#      that mattered was skipped.
+#
+# ---------------------------------------------------------------------------------------
+# SECTIONS — the thing GitHub has no equivalent of, and why they are used below
+# ---------------------------------------------------------------------------------------
+# GitHub CODEOWNERS is one flat list where the LAST matching pattern wins, and only that
+# one owner set applies. That single rule is the trap: a catch-all `*` line placed after a
+# specific path silently erases it, and the file still looks correct.
+#
+# GitLab evaluates each named section INDEPENDENTLY. A file can match a rule in three
+# sections and then needs approval from all three. `*` in one section can no longer cancel
+# a specific path in another, and each section carries its own required-approval count.
+# That is exactly the shape of the intent here: everything needs an owner, and a few paths
+# need more than that.
+#
+# Syntax notes for whoever edits this next:
+#   `[Name][n] @owner`   required section; `n` distinct approvals; `@owner` is the default
+#                        owner for every entry in it that names none.
+#   `^[Name]`            OPTIONAL section — suggests reviewers, requires nothing. Not used
+#                        below: every path here is load-bearing, and an optional rule on a
+#                        load-bearing path is decoration.
+#   Entries before the first section land in an implicit default section.
+#
+# ***THE `[2]` TRAP***: two required approvals means two DISTINCT eligible approvers. If
+# `@OWNER` is substituted with a single user, every MR touching that section deadlocks —
+# permanently, with no error message beyond "requires 2 approvals". Substitute a GROUP with
+# at least two members there, or drop the `[2]` down to `[1]`. Do not leave a single-user
+# owner behind a two-approval section and discover it during an incident fix.
+
+# Everything has an owner. Without this, a path nobody listed is a path nobody reviews.
+[Everything][1] @OWNER
+*
+
+# THE STANDARD ITSELF — the highest blast radius in this repository, and the reason for a
+# second approver.
+#
+# `standard/` holds the rule sources and `CLAUDE.md` is the file they generate; every repo
+# created from here VENDORS a copy of both. There is no version pin, no import graph and no
+# compiler, so a bad edit here does not fail anyone's build — it silently desynchronises a
+# dozen repositories and surfaces weeks later as a drift-gate failure in a repo whose author
+# changed nothing. `templates/` is the same problem in a different shape: it is shipped
+# verbatim into every spawned repo, so a mistake in a scaffold is a mistake in every
+# repository created after it and in none created before.
+#
+# Two approvals is not ceremony. It is the only mechanism that exists between an edit here
+# and twelve repositories inheriting it, because nothing downstream can reject it.
+[The standard and what it spawns][2] @OWNER
+/CLAUDE.md
+/standard/
+/templates/
+
+# CI, GATES AND DEPENDENCY POLICY — the rules and CI are load-bearing.
+#
+# These files decide what "green" means. Someone who can weaken a gate can merge anything
+# afterwards without ever touching the thing they wanted to merge, and the weakening is the
+# part nobody re-reads. `renovate.json` belongs here for the same reason: it decides which
+# third-party code enters this repo unattended and under which label — and the `dependencies`
+# label is itself a doc-sync exemption.
+#
+# `.github/` stays listed even on a GitLab-hosted project: while both pipelines exist, an
+# edit there still changes what this repository claims to enforce.
+[CI, gates and dependency policy][1] @OWNER
+/.gitlab-ci.yml
+/.gitlab/
+/renovate.json
+/.github/
+/.pre-commit-config.yaml
+
+# THE DEPLOYABLE SURFACE — the layout the service profile declares canonical.
+#
+# `helm/` and `deploy/Dockerfile`, not `chart/` and a root `Dockerfile`: the layout moved,
+# and an ownership rule pointing at the old paths guards empty space while reading as if it
+# guards the image. These two files are what actually runs in a cluster — the security
+# context, the non-root uid, the resource limits and the probes all live here, and every one
+# of them fails open when it is quietly removed.
+[Deployable surface][1] @OWNER
+/deploy/
+/helm/

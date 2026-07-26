@@ -1,10 +1,14 @@
 <!--
-The GitLab twin is `.gitlab/merge_request_templates/default.md`. Keep the two SAYING THE SAME
-THING: a checklist that is stricter on one host teaches people that the review bar depends on
-where the change happened to land.
+GitLab applies the template named `Default` to every new merge request automatically; the
+others in this directory are opt-in from the description dropdown. If your instance does not
+pick this one up, the file name is the thing to check first.
+
+The GitHub twin is `.github/PULL_REQUEST_TEMPLATE.md`. Keep the two SAYING THE SAME THING: a
+checklist that is stricter on one host teaches people that the review bar depends on where
+the change happened to land.
 
 Merge only when CI is green. Feature branches target `dev`; `dev` -> `rc` -> `release` is a
-separate, approval-gated promotion, never something a feature PR does on its way past.
+separate, approval-gated promotion, never something a feature MR does on its way past.
 See CLAUDE.md § Per-task lifecycle.
 -->
 
@@ -30,7 +34,7 @@ is a review conversation. A ticked box that was not true is the reason nobody tr
       tagged. **(a)** automated, green in CI, and the run logs actually read *even though they
       are green*; **(b)** dev/sandbox tests run by the agent; **(c)** a human-in-the-loop
       methodology written and handed to the user; **(d)** cross-service e2e updated **in the
-      platform repo in the same change set** (a separate PR there, linked by the platform id).
+      platform repo in the same change set** (a separate MR there, linked by the platform id).
       A tier that does not apply is written down as N/A with its reason — an unmentioned tier
       is indistinguishable from a forgotten one.
 - [ ] **Observability shipped in this change, not as a follow-up.** The metrics that make
@@ -48,9 +52,9 @@ is a review conversation. A ticked box that was not true is the reason nobody tr
 - [ ] **Docs in lockstep, in this change** — `README.md`, `docs/*`, `docs/configuration.md`
       for a new or renamed env var, `CHANGELOG.md` under `## [Unreleased]`.
 - [ ] **`AUTOPILOT-LOG.md` entry added** if this was an autonomous change of any substance.
-- [ ] **`doc-sync` is green.** It fails a PR that moves the code/deploy/standard surface
+- [ ] **`doc-sync` is green.** It fails an MR that moves the code/deploy/standard surface
       without touching a doc. If this change genuinely needs none, use the escape hatch
-      deliberately — the `no-docs` label, or `[skip doc-sync]` in the PR title — and say here
+      deliberately — the `no-docs` label, or `[skip doc-sync]` in the MR title — and say here
       why. Reaching for it by reflex is how the gate stops meaning anything.
 - [ ] **`standard-drift` is green.** `CLAUDE.md` is **generated** by `./standard/compose.sh`
       from `standard/base.md` + `standard/profiles/<profile>.md` + `standard/repo.env`. If the
