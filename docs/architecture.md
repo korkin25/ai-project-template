@@ -33,13 +33,31 @@ retention policy and a second thing to be out of sync. Which host and therefore 
 is a project decision recorded here, not something the standard decides. Runtime configuration
 is in [configuration.md](configuration.md); the chart's own knobs are in `helm/README.md`.
 
-**CI host — not yet settled for this repo.** The standard requires exactly one host, chosen
-once and recorded in this section. This repo currently carries *both* `.gitlab-ci.yml` and
-`.github/workflows/ci.yml`, and only the GitHub one has ever run. That is the state the
-standard warns about — a half-maintained second pipeline fails for reasons nobody
-investigates and trains everyone to ignore a red check. Resolving it is `PRJ-14` (make the
-standard host-agnostic) and `PRJ-17` (mirror to GitLab and prove parity); until one of them
-lands, treat neither pipeline as authoritative.
+**CI host — settled: GitHub is the source, GitLab is a mirror, and both run the gates.**
+`github.com/korkin25/ai-project-template` is where changes land;
+`gitlab.com/korkin25/ai-project-template` is a mirror of it. They are **identical copies** —
+not two repositories that happen to agree, which is the state the standard warns about, but
+one repository reachable from two places.
+
+**Therefore every change here must be universal.** No patch may assume a host. The governance
+artifacts exist in both dialects and are edited in the same change — `.github/CODEOWNERS` and
+`.gitlab/CODEOWNERS`, `dependabot.yml` and `renovate.json`,
+`PULL_REQUEST_TEMPLATE.md` and `merge_request_templates/default.md`, `ci.yml` and
+`.gitlab-ci.yml`. Updating one side and leaving the other is incomplete work: it teaches
+readers that the review bar depends on which host they happened to open.
+
+This is the one profile-level exception the standard permits, and it is permitted for a
+reason it has already earned. `auto-tests/group-a/validate-deploy.sh` passed on GitHub for
+months and **could never have passed on GitLab** — it probed `localhost` after publishing a
+port into a DinD service's network namespace, which is reachable only as `docker`. Running
+the same committed script on the second host is what found it, and every repo scaffolded from
+here had inherited the same defect. A mirror that runs only a decorative subset would have
+found nothing.
+
+Where a capability exists on one host only, it is recorded here rather than left for someone
+to discover from a red pipeline. Known today: PyPI Trusted Publishing via OIDC works from
+both, but only for public PyPI — GitLab's own package registry authenticates with
+`CI_JOB_TOKEN` and has no OIDC path.
 
 ### Layout — canonical, and deliberately so
 

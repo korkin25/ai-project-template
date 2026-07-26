@@ -77,10 +77,30 @@ the standard's.
 | Dependency bot | Renovate | Dependabot or Renovate |
 | Templates | `.gitlab/merge_request_templates/` | `.github/PULL_REQUEST_TEMPLATE.md` |
 
-**Support exactly one.** Publishing to both is allowed only when someone owns keeping them in
-parity: a half-maintained second pipeline is worse than none, because it fails for reasons
-nobody investigates and trains everyone to ignore a red check. If the second host exists only
-to mirror the source, give it no pipeline at all rather than a decorative one.
+**One host, or a mirror. Never two repositories.** The distinction is what makes the
+difference, and it is about who guarantees parity:
+
+- **Two hand-maintained repositories** is the bad case. They drift, because nothing forces
+  them not to. A half-maintained second pipeline is worse than none: it fails for reasons
+  nobody investigates and trains everyone to ignore a red check.
+- **One repository mirrored to a second host** is legitimate and sometimes better. Parity is
+  mechanical — the mirror cannot hold a file the source does not — so the two pipelines run
+  the *same committed inputs* and any difference in outcome is a difference in the hosts, not
+  in the code.
+
+**A mirror should run the full gate set, not a decorative subset.** That is the entire value:
+running both is how host-specific defects surface. Concretely, in this standard's own repo,
+a smoke test that had passed on one host for months could never have passed on the other —
+the probe assumed a network layout that host does not have. Nothing but running it there
+would have found it, and every repo scaffolded from here had inherited the same script.
+
+**The rule that follows, for a mirrored repo: every change must be universal.** No patch may
+assume one host. In practice that means the governance artifacts exist in both dialects and
+are edited together — `CODEOWNERS` in each syntax, both dependency bots, both merge/pull
+templates, both pipelines — and a change touching one side without the other is incomplete
+work, not a follow-up. Where a capability genuinely exists on only one host, the difference
+is written down in `docs/architecture.md` rather than left for a reader to discover from a
+red pipeline.
 
 **Gate policy:** a newly-added scanner starts in report mode (soft-fail); tighten it to a
 hard gate once the baseline is clean — but **never silently drop one**.
