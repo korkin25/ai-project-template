@@ -559,9 +559,40 @@ and ask** — an unasked question is cheaper than an unsafe action.
 
 ## Autopilot log
 
-`AUTOPILOT-LOG.md` is the **resume point**. A session can end at any moment; the next one —
-possibly a different agent, possibly a human — must be able to read this file and continue
-without re-deriving anything. It is mandatory in every repo.
+`AUTOPILOT-LOG.md` is the **resume point**, and it is written for the case where **the session
+is simply gone** — not paused, not compacted, gone. The tool crashed, the transcript did not
+restore, the work continues next week in a different agent or by a human who was never in the
+conversation. It is mandatory in every repo.
+
+That premise decides everything about how an entry is written:
+
+- **Assume the reader has no session context whatsoever.** No "as discussed above", no "the
+  fix mentioned earlier", no pronoun whose referent is a chat message. If a sentence only
+  parses for someone who watched the work happen, it does not survive the thing this file
+  exists for.
+- **Assume the transcript is unavailable.** Chat history, tool output and scratch files are
+  all session-scoped and all disappear together. Anything that matters is in this file or it
+  is lost — including the things that felt too obvious to write down at the time, which are
+  exactly the ones nobody can reconstruct.
+- **Name paths, commands, versions and identifiers in full.** A future reader cannot ask a
+  follow-up question.
+
+### Write it before the work is finished, not after
+
+The failure this prevents is the common one: a session dies **mid-change**, and because the
+entry was going to be written at the end, nothing was written at all. The next session finds a
+half-migrated repository, an uncommitted working tree, or a branch whose purpose nobody can
+infer — and has to reconstruct intent from a diff, which is the one thing a diff cannot carry.
+
+So: for anything that will take more than a few steps, open the entry **when you start**, with
+what you are doing and why, and fill in the verification when it lands. An entry that says
+*"in progress: extracting the shared library; imports rewritten, tests not yet ported"* is
+worth more than a perfect entry that was never written.
+
+**Record in-flight state explicitly** — what is committed, what is only in the working tree,
+what is pushed, what is half-done and where the seam is. Committed work is recoverable from
+git; work that exists only in a session is not, and a note saying it existed is the difference
+between redoing it deliberately and discovering it by accident.
 
 Write an entry for any autonomous change of substance: a feature, a refactor, a CI change, a
 decision taken, or a blocker discovered. Trivial typo fixes do not need one.
@@ -573,9 +604,10 @@ Format — newest first, one `##` section per working session:
 
 **What changed.** <the actual change, concretely — files, behaviour, versions>
 **Why.** <the reason, including what was rejected and why, if a choice was made>
+**State.** <branch; what is committed, what is pushed, what exists only in the working tree>
 **Verified by.** <the command or CI run that proves it works, with its result>
 **Reverse.** <how to undo it — a revert, a config flip, a restored file>
-**Open.** <anything left unfinished or blocked, with the ticket id>
+**Open.** <anything unfinished or blocked, with the ticket id and where the seam is>
 ```
 
 Rules:

@@ -12,10 +12,17 @@ accidentally drop one of them.
        even though this process is a worker with no business HTTP surface. The chart renders
        an httpGet probe against it and the platform's tier-(d) tests use it to decide when a
        rollout is finished.
-    3. Logs are structured JSON on stdout (:class:`JsonFormatter`). The container runtime
+    3. ``GET /metrics`` answers 200 with Prometheus text (:class:`Metrics`), on the SAME
+       server and the SAME port as ``/health``. A worker has no request traffic to measure,
+       which is exactly why it needs this: with no HTTP surface, the counters below are the
+       only evidence outside the log that the loop is still consuming anything. The chart's
+       ServiceMonitor scrapes this path, so the handler and the chart flag move together —
+       a ServiceMonitor aimed at a path the process does not serve is a scrape target that
+       fails silently, leaving empty panels and telling nobody why.
+    4. Logs are structured JSON on stdout (:class:`JsonFormatter`). The container runtime
        owns log shipping; a process that writes files needs a writable filesystem, and this
        one deliberately has none.
-    4. Shutdown is graceful (:func:`run_worker`): SIGTERM stops *intake*, the in-flight batch
+    5. Shutdown is graceful (:func:`run_worker`): SIGTERM stops *intake*, the in-flight batch
        is finished and committed, and the process exits 0. Exiting non-zero on a normal
        shutdown makes Kubernetes report CrashLoopBackOff for a healthy deployment.
 
@@ -44,6 +51,11 @@ from typing import Any, Protocol
 from . import __version__
 
 LOG = logging.getLogger(__name__)
+
+# The Prometheus text exposition Content-Type, version parameter included. A scraper that
+# receives `text/plain` without `version=0.0.4` (or worse, `application/json`) records the
+# target as up and the sample as unparseable — a green target with no series behind it.
+CONTENT_TYPE_METRICS = "text/plain; version=0.0.4; charset=utf-8"
 
 
 # ---------------------------------------------------------------------------------------
@@ -151,7 +163,78 @@ def configure_logging(level: str) -> None:
 
 
 # ---------------------------------------------------------------------------------------
-# Health endpoint
+# Metrics — Prometheus text exposition
+# ---------------------------------------------------------------------------------------
+@dataclass
+class Metrics:
+    """The counters this worker maintains, rendered on demand as Prometheus text.
+
+    Hand-rolled rather than pulling a client library, for the same reason as
+    :class:`JsonFormatter`: a dependency here lands in the image, in the SBOM and in every
+    CVE triage, in exchange for a few lines of string formatting. Swap in a real client
+    library the moment you need histograms — quantiles are where hand-rolling stops paying.
+
+    **Every counter here is one the worker actually increments.** A metric that is wired to
+    nothing reports a steady zero, which is indistinguishable from "nothing is happening" —
+    the single most expensive kind of wrong, because an alert built on it never fires.
+
+    ``received`` and ``committed`` are two counters rather than one on purpose: their
+    difference is the commit-after-success invariant made observable. A persistent gap means
+    work is being taken and not acknowledged, which is the shape of a poison message; the two
+    numbers moving together is the only external evidence the loop is healthy.
+    """
+
+    started_at: float = field(default_factory=time.monotonic)
+    received: int = 0
+    committed: int = 0
+    # The worker loop and the HTTP thread touch these concurrently: `+=` on an int is a read
+    # and a write, and a counter that quietly undercounts is worse than no counter at all.
+    lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+
+    def record_received(self, count: int) -> None:
+        with self.lock:
+            self.received += count
+
+    def record_committed(self, count: int = 1) -> None:
+        with self.lock:
+            self.committed += count
+
+    def render(self, version: str) -> str:
+        """The exposition body. ``version`` is what ``/health`` reports, so they cannot drift.
+
+        Every label value comes from a fixed, tiny set. A label carrying an unbounded value —
+        a message key, a user id, a raw error string — multiplies series until the metrics
+        backend degrades and takes the dashboards of every other service with it. Unbounded
+        values are log fields, never metric labels.
+        """
+        with self.lock:
+            received, committed = self.received, self.committed
+        uptime = time.monotonic() - self.started_at
+        return (
+            "# HELP app_build_info Build information; the value is always 1.\n"
+            "# TYPE app_build_info gauge\n"
+            f'app_build_info{{version="{version}"}} 1\n'
+            "# HELP app_uptime_seconds Seconds since this process started.\n"
+            "# TYPE app_uptime_seconds gauge\n"
+            f"app_uptime_seconds {uptime:.3f}\n"
+            "# HELP app_messages_received_total Messages taken from the source.\n"
+            "# TYPE app_messages_received_total counter\n"
+            f"app_messages_received_total {received}\n"
+            "# HELP app_messages_committed_total Messages acknowledged after processing.\n"
+            "# TYPE app_messages_committed_total counter\n"
+            f"app_messages_committed_total {committed}\n"
+        )
+
+
+# One registry per process, like the global registry every Prometheus client library ships.
+# The alternative — threading an instance through every call site — looks tidier right up to
+# the first caller that forgets, and that caller's numbers stay at zero with nothing to show
+# for it. Tests that need isolation pass their own :class:`Metrics` explicitly.
+METRICS = Metrics()
+
+
+# ---------------------------------------------------------------------------------------
+# Health and metrics endpoints
 # ---------------------------------------------------------------------------------------
 @dataclass
 class HealthState:
@@ -169,14 +252,20 @@ class HealthState:
 
 
 class HealthHandler(BaseHTTPRequestHandler):
-    """Serves ``GET /health`` and nothing else.
+    """Serves the two endpoints the runtime contract requires, and nothing else.
 
-    ``state`` is injected by :func:`start_health_server` through a subclass, because
-    ``BaseHTTPRequestHandler`` is instantiated per request by the server and has no other
-    way to receive dependencies.
+    ``GET /health`` → JSON, ``GET /metrics`` → Prometheus text. One server on one port: a
+    worker has no business HTTP surface, so a second listener would mean a second container
+    port, a second Service port and a second thing to get wrong in the chart, all to separate
+    two handlers that answer the same three callers (the kubelet, the scraper, tier-(d)).
+
+    ``state`` and ``metrics`` are injected by :func:`start_health_server` through a subclass,
+    because ``BaseHTTPRequestHandler`` is instantiated per request by the server and has no
+    other way to receive dependencies.
     """
 
     state: HealthState
+    metrics: Metrics
     # Answer HTTP/1.1 so probes can keep the connection alive; the default HTTP/1.0 makes
     # each probe a fresh TCP connection and shows up as socket churn under a 1s period.
     protocol_version = "HTTP/1.1"
@@ -184,16 +273,29 @@ class HealthHandler(BaseHTTPRequestHandler):
     # The camelCase name is mandated by BaseHTTPRequestHandler's dispatch (it looks up
     # "do_" + the HTTP verb), so it is not ours to rename.
     def do_GET(self) -> None:
-        if self.path.split("?", 1)[0] != "/health":
+        route = self.path.split("?", 1)[0]
+        if route == "/health":
+            # 200 even while draining, and the caller learns the real state from `status`.
+            # A failing liveness probe during termination gets the container KILLED, which is
+            # precisely the graceful shutdown this service is trying to perform.
+            body = json.dumps(self.state.payload()).encode("utf-8")
+            self._respond(HTTPStatus.OK, "application/json", body)
+        elif route == "/metrics":
+            # The version rendered here is the one /health reports — same source, so a
+            # dashboard grouping by `version` and a probe response can never disagree.
+            body = self.metrics.render(self.state.version).encode("utf-8")
+            self._respond(HTTPStatus.OK, CONTENT_TYPE_METRICS, body)
+        else:
             self.send_error(HTTPStatus.NOT_FOUND)
-            return
 
-        # 200 even while draining, and the caller learns the real state from `status`.
-        # A failing liveness probe during termination gets the container KILLED, which is
-        # precisely the graceful shutdown this service is trying to perform.
-        body = json.dumps(self.state.payload()).encode("utf-8")
-        self.send_response(HTTPStatus.OK)
-        self.send_header("Content-Type", "application/json")
+    def _respond(self, status: HTTPStatus, content_type: str, body: bytes) -> None:
+        """One write path for every route, so no response can forget Content-Length.
+
+        Under HTTP/1.1 keep-alive a missing Content-Length is not a cosmetic omission: the
+        client waits for a body terminator that never comes and the probe times out.
+        """
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -207,21 +309,23 @@ class HealthHandler(BaseHTTPRequestHandler):
         the one-JSON-object-per-line promise; and a probe every second at INFO would drown
         every real event in the log.
         """
-        LOG.debug("health request: " + format, *args)
+        LOG.debug("http request: " + format, *args)
 
 
-def start_health_server(cfg: Config, state: HealthState) -> ThreadingHTTPServer:
-    """Start the health server on a daemon thread and return it.
+def start_health_server(
+    cfg: Config, state: HealthState, metrics: Metrics = METRICS
+) -> ThreadingHTTPServer:
+    """Start the health/metrics server on a daemon thread and return it.
 
     A separate thread because the worker loop owns the main thread and must stay responsive
     to signals; a daemon thread because a hung HTTP thread must never be the reason a
     terminating pod has to be SIGKILLed.
     """
-    handler = type("BoundHealthHandler", (HealthHandler,), {"state": state})
+    handler = type("BoundHealthHandler", (HealthHandler,), {"state": state, "metrics": metrics})
     server = ThreadingHTTPServer((cfg.host, cfg.port), handler)
     thread = threading.Thread(target=server.serve_forever, name="health", daemon=True)
     thread.start()
-    LOG.info("health endpoint listening on %s:%s/health", cfg.host, cfg.port)
+    LOG.info("http endpoints listening on %s:%s (/health, /metrics)", cfg.host, cfg.port)
     return server
 
 
@@ -281,7 +385,9 @@ def handle_message(message: Message) -> None:
     LOG.info("processing message %s", message.key)
 
 
-def run_worker(source: Source, cfg: Config, stop: threading.Event) -> None:
+def run_worker(
+    source: Source, cfg: Config, stop: threading.Event, metrics: Metrics = METRICS
+) -> None:
     """Consume until ``stop`` is set, committing only what actually succeeded.
 
     The shutdown semantics are the interesting part:
@@ -290,15 +396,22 @@ def run_worker(source: Source, cfg: Config, stop: threading.Event) -> None:
     * the batch already in hand is finished and committed, so no in-flight work is lost;
     * a message that raises is NOT committed and will be redelivered — losing it silently
       would be worse than reprocessing it, which :func:`handle_message` is idempotent for.
+
+    The two counter calls mirror that ordering exactly, which is what makes ``/metrics``
+    worth scraping: ``received`` rises when work is taken, ``committed`` only once it is
+    done, so a widening gap on a dashboard IS the stuck-message symptom, visible before
+    anyone reads a log.
     """
     LOG.info("worker started")
     while not stop.is_set():
         batch = source.receive(cfg.poll_interval_seconds)
+        metrics.record_received(len(batch))
         for message in batch:
             handle_message(message)
             # After, never before: a crash on the line above must leave the message
             # uncommitted so the broker redelivers it.
             source.commit(message)
+            metrics.record_committed()
     LOG.info("worker stopped: intake closed, in-flight work committed")
 
 

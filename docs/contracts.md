@@ -144,6 +144,17 @@ infra     manifests/ · scripts/check-versions.py · docs/runbook.md
 Every profile additionally carries `standard/repo.env`, `docs/{architecture,configuration,
 tests}.md`, `TODO.md`, `CHANGELOG.md`, `AUTOPILOT-LOG.md`, `.gitlab-ci.yml`.
 
+**In the `service` scaffold, `GET /metrics` and the chart's `ServiceMonitor` are one unit.**
+`src/@@PKG@@/main.py` serves the endpoint on the same port as `/health`,
+`helm/templates/servicemonitor.yaml` scrapes it, and `helm/values.yaml` gates it behind
+`serviceMonitor.enabled: false` because the CRD is a cluster prerequisite. The *pairing* is
+the contract, not either file: ship the ServiceMonitor without the handler and every repo
+built from the scaffold gets a target that 404s — discovered, scraped, storing nothing, with
+no alert to fire because the alert needs the series that never arrived. Ship the handler
+without the ServiceMonitor and the endpoint is never read at all. `standard/profiles/service.md`
+requires both of *every* service, so the scaffold is where that promise is either kept or
+quietly broken for the whole fleet at once.
+
 Moving a path in a scaffold does not migrate the repos already built from it — it forks
 them. From that day the scaffold and the fleet disagree, and the next person to compare them
 cannot tell which side is the mistake.
@@ -274,7 +285,7 @@ placeholder ends up pinned in production:
 
 | Not a contract | Why it exists |
 |---|---|
-| `src/app/` — the `/health` endpoint, the `app` / `app-serve` commands | a sample service that keeps this repo's own CI green and demonstrates the shape; replaced on adoption |
+| `src/app/` — the `GET /health` and `GET /metrics` endpoints, the `APP_VERSION` variable, the `app` / `app-serve` commands | a sample service that keeps this repo's own CI green and demonstrates the shape; replaced on adoption. What *is* binding is the profile rule they demonstrate (below), not this implementation of it |
 | `helm/` values — `ghcr.io/OWNER/REPO`, `tag: ""` | template placeholders; `OWNER/REPO` is not a registry path |
 | `docker-compose.yml` — `image: ghcr.io/OWNER/REPO:latest` | local-run convenience. A version auditor reading this repo flags it as `UNPINNED`; that finding is about a placeholder, not about a deployed image |
 | `.claude-plugin` plugin version | absent on purpose; resolution falls back to the commit SHA. Not an interface, and re-adding it would freeze every install |

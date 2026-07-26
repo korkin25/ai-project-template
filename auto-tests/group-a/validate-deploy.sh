@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Group-(a) functional smoke test. Chart linting lives in the shared `helm` CI job, so this
 # script proves what only a running container can: that the image boots under the same
-# restrictions the chart imposes, serves `/health` in the shape the profile mandates, and
-# shuts down cleanly on SIGTERM.
+# restrictions the chart imposes, serves `/health` and `/metrics` in the shapes the profile
+# mandates, and shuts down cleanly on SIGTERM.
 #
 # This is the script `templates/service/` scaffolds, with its placeholders resolved —
 # deliberately. A reference implementation running a weaker test than the one it ships is how
@@ -119,10 +119,39 @@ case "${body}" in
   *) echo "FAIL: /health body has no \"version\" key"; exit 1 ;;
 esac
 
+# The chart's ServiceMonitor scrapes this path, and NOTHING ELSE IN CI PROVES THE RUNNING
+# IMAGE SERVES IT: `helm lint` renders a ServiceMonitor against a 404 just as happily as
+# against a real endpoint, and the pytest suite exercises the handler, not the container.
+# Without this probe the first symptom of a broken /metrics is an empty dashboard panel in
+# a cluster, weeks later, with no alert — the alert needs the series that never arrived.
+#
+# No retry loop: /health already answered above, so the server is up. The same `probe`
+# helper, never a bare curl — the runner image ships neither curl nor wget by default.
+echo "== probe http://${HOST}:${PORT}/metrics =="
+metrics="$(probe "http://${HOST}:${PORT}/metrics" || true)"
+if [ -z "${metrics}" ]; then
+  echo "FAIL: /metrics did not answer at http://${HOST}:${PORT}/metrics"
+  echo "HINT: the chart's serviceMonitor.path must be a path the process actually serves"
+  exit 1
+fi
+
+# Shape, not an exact payload. Every Prometheus exposition carries `# TYPE` lines; pinning
+# the body would turn each added metric into a test failure and teach people to delete the
+# assertion. This catches the case that matters — a 200 that is JSON, HTML or an error page.
+case "${metrics}" in
+  *'# TYPE '*) ;;
+  *)
+    echo "FAIL: /metrics answered but the body is not Prometheus exposition (no '# TYPE'):"
+    printf '%s\n' "${metrics}" | head -5
+    exit 1
+    ;;
+esac
+echo "metrics first line: $(printf '%s\n' "${metrics}" | head -1)"
+
 echo "== graceful shutdown: SIGTERM must exit within the grace period =="
 # `docker stop` sends SIGTERM and only SIGKILLs after -t seconds, which is what Kubernetes
 # does with terminationGracePeriodSeconds. Exit 137 here means the process ignored SIGTERM and
 # was killed — in-flight work would be lost on every rollout.
 docker stop -t 30 "${CONTAINER}" >/dev/null
 
-echo "OK: image boots read-only as non-root, serves /health, and stops on SIGTERM"
+echo "OK: image boots read-only as non-root, serves /health and /metrics, stops on SIGTERM"

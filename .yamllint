@@ -24,11 +24,22 @@ ignore: |
   # top of a file is a syntax error to any YAML parser, so linting them reports noise that
   # can never be fixed and trains everyone to ignore this linter's output.
   #
-  # BOTH paths are listed on purpose. This repository still keeps its own chart under
-  # `chart/`, while the service profile declares `helm/` canonical and the scaffolds in
-  # `templates/` use it — so an ignore written for one layout silently stops covering the
-  # other. That is exactly what happened: `templates/service/helm/templates/*.yaml` was
-  # linted as YAML and made `yamllint templates/` permanently red.
+  # BOTH paths are listed on purpose, and `chart/` is KEPT even though this repository no
+  # longer has one — it migrated to the canonical `helm/` (docs/architecture.md, "Layout").
+  #
+  # It stays because the service profile permits a documented deviation: a repo with a real
+  # constraint may keep `chart/` and say why in its own docs/architecture.md, and the shared
+  # CI carries a `CHART_PATH` override for exactly that. The fleet therefore genuinely holds
+  # both layouts, and this repo lints `templates/` — the trees those repos are created from.
+  # The two doc-sync gates already match `chart/` beside `helm/` for the same reason
+  # (.github/workflows/doc-sync.yml, and templates/service/.gitlab-ci.yml, which states it
+  # outright); dropping it from this one alone would leave three gates disagreeing about
+  # which layouts exist, and nothing would report the disagreement.
+  #
+  # The asymmetry decides it: a pattern for a directory that does not exist costs nothing,
+  # while a missing one costs a linter that reports Go templates as broken YAML. That is not
+  # hypothetical — `templates/service/helm/templates/*.yaml` was linted as YAML and made
+  # `yamllint templates/` permanently red, which is how a team learns to ignore a linter.
   # Leading `**/` is load-bearing. yamllint matches with gitignore semantics, where a pattern
   # containing a slash anywhere but the end is ANCHORED to the config's directory — so a bare
   # `helm/templates/` covers only `./helm/templates/` and silently misses every scaffold under

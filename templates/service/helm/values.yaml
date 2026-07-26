@@ -49,6 +49,22 @@ serviceAccount:
   # Empty ⇒ the service's own name. Set only to adopt an account the infra repo owns.
   name: ""
 
+# Prometheus Operator scrape. `path` MUST be one the process actually serves — the worker
+# skeleton serves /health and /metrics on the same port (see src/@@PKG@@/main.py), and the
+# handler and this flag were added in the same change on purpose. A ServiceMonitor pointing
+# at a 404 is a scrape target that fails silently: empty panels, no alert, no explanation.
+#
+# Off by default because the CRD is a cluster prerequisite, not a given. `enabled: true`
+# without monitoring.coreos.com installed fails at APPLY time, which is far from here.
+# Enable it per environment from the platform repo's values, where the cluster is known.
+serviceMonitor:
+  enabled: false
+  path: /metrics
+  interval: 30s
+  # The label the cluster's Prometheus selects ServiceMonitors by — cluster-specific, so no
+  # default: a ServiceMonitor the operator does not select is created and then ignored.
+  labels: {}
+
 probes:
   path: /health
   # Generous initialDelay + low failureThreshold on readiness, longer on liveness: readiness

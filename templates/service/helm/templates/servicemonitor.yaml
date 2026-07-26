@@ -1,0 +1,42 @@
+{{- if .Values.serviceMonitor.enabled }}
+{{- if not .Values.service.enabled }}
+{{- fail "serviceMonitor.enabled=true requires service.enabled=true — a ServiceMonitor selects Services, so with none it silently scrapes nothing" }}
+{{- end }}
+# Prometheus Operator scrape configuration.
+#
+# This resource and the /metrics handler in src/@@PKG@@/main.py are ONE change. A
+# ServiceMonitor aimed at a path the process does not serve is the worst kind of monitoring
+# defect: the target is discovered, the scrape 404s, no alert fires because the alert needs
+# the series that never arrived — the panels are simply empty, and nobody is told why.
+#
+# The guard above catches the same failure one level down. A ServiceMonitor selects
+# Services, not Pods; with service.enabled=false it matches nothing at all and reports no
+# error whatsoever. Rendering must fail here rather than in a cluster three weeks later.
+#
+# `monitoring.coreos.com/v1` is a CRD `helm lint` cannot see. Off by default means absent,
+# not degraded — but turning it on adds a cluster prerequisite, and a release templating a
+# kind whose CRD is missing fails at APPLY time, not at lint time. The prerequisite is
+# declared in the platform repo's requirements.yaml; this chart only reads the flag.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "@@PROJECT@@.fullname" . }}
+  labels:
+    {{- include "@@PROJECT@@.labels" . | nindent 4 }}
+    {{- with .Values.serviceMonitor.labels }}
+    # The label the Prometheus instance selects ServiceMonitors by. It is cluster-specific,
+    # so it has no default here and arrives from the platform's environment values — a
+    # ServiceMonitor the operator does not select is created successfully and ignored.
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "@@PROJECT@@.selectorLabels" . | nindent 6 }}
+  endpoints:
+    # By NAME, matching service.yaml. A number here would keep working right up to the day
+    # the container port moves, and then scrape a port nothing listens on.
+    - port: http
+      path: {{ .Values.serviceMonitor.path }}
+      interval: {{ .Values.serviceMonitor.interval }}
+{{- end }}

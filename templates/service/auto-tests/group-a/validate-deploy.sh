@@ -16,7 +16,13 @@
 #      a writable rootfs passes every unit test and then CrashLoops in the cluster;
 #   3. GET /health answers 200 with {"status", "version"} — the runtime contract the chart's
 #      probes and the platform's tier-(d) tests depend on;
-#   4. SIGTERM shuts it down gracefully with exit code 0 within the grace period. This is
+#   4. GET /metrics answers 200 with Prometheus text — the path helm/templates/
+#      servicemonitor.yaml scrapes. Nothing else in the pipeline proves the RUNNING image
+#      serves it: helm-package.yml renders a ServiceMonitor against a 404 exactly as happily
+#      as against a real endpoint, and the pytest suite exercises the handler, not the
+#      container. Without this the first symptom is an empty panel weeks later, with no
+#      alert, because the alert needs the series that never arrived;
+#   5. SIGTERM shuts it down gracefully with exit code 0 within the grace period. This is
 #      the check nothing else can make: a service that ignores SIGTERM looks perfectly
 #      healthy until a rollout drops its in-flight work.
 #
@@ -79,10 +85,26 @@ docker run -d --name "${CONTAINER}" \
   -p "${PORT}:8080" \
   "${IMAGE}" >/dev/null
 
+# Pick the probe tool BEFORE the loop, and fail loudly if there is none. The loop discards
+# stderr — it has to, or thirty connection-refused messages bury the real output — which means
+# a missing tool looks exactly like a service that never came up: thirty silent seconds and a
+# timeout. The runner image functional.yml uses is `docker:*` (Alpine), which ships neither
+# curl nor wget unless FUNCTIONAL_RUNNER_PACKAGES asks for them. Never inline a bare `curl`
+# below: the failure it produces names the wrong cause and costs a full CI cycle to read.
+if command -v curl >/dev/null 2>&1; then
+  probe() { curl -fsS "$1" 2>/dev/null; }
+elif command -v wget >/dev/null 2>&1; then
+  probe() { wget -qO- "$1" 2>/dev/null; }
+else
+  echo "FAIL: neither curl nor wget is available — the probe cannot run"
+  echo "HINT: add them to FUNCTIONAL_RUNNER_PACKAGES in .gitlab-ci.yml"
+  exit 1
+fi
+
 echo "== probe http://${HOST}:${PORT}/health =="
 body=""
 for _ in $(seq 1 30); do
-  if body="$(curl -fsS "http://${HOST}:${PORT}/health" 2>/dev/null)"; then
+  if body="$(probe "http://${HOST}:${PORT}/health")" && [ -n "${body}" ]; then
     break
   fi
   body=""
@@ -111,6 +133,30 @@ case "${body}" in
   *) echo "FAIL: /health body has no \"version\" key"; exit 1 ;;
 esac
 
+# No retry loop: /health already answered, so the server is up and the same handler serves
+# both routes (src/@@PKG@@/main.py). A second 30-second wait here would only ever burn CI
+# time on a failure that is already decided.
+echo "== probe http://${HOST}:${PORT}/metrics =="
+metrics="$(probe "http://${HOST}:${PORT}/metrics" || true)"
+if [ -z "${metrics}" ]; then
+  echo "FAIL: /metrics did not answer at http://${HOST}:${PORT}/metrics"
+  echo "HINT: helm/values.yaml serviceMonitor.path must be a path the process actually serves"
+  exit 1
+fi
+
+# Shape, not an exact payload. Every Prometheus exposition carries `# TYPE` lines; pinning
+# the body would turn each added metric into a test failure and teach people to delete the
+# assertion. This catches the case that matters — a 200 that is JSON, HTML or an error page.
+case "${metrics}" in
+  *'# TYPE '*) ;;
+  *)
+    echo "FAIL: /metrics answered but the body is not Prometheus exposition (no '# TYPE'):"
+    printf '%s\n' "${metrics}" | head -5
+    exit 1
+    ;;
+esac
+echo "metrics first line: $(printf '%s\n' "${metrics}" | head -1)"
+
 echo "== graceful shutdown: SIGTERM must exit 0 within the grace period =="
 # `docker stop` sends SIGTERM and only SIGKILLs after -t seconds, which is exactly what
 # Kubernetes does with terminationGracePeriodSeconds. Exit code 137 here means the process
@@ -122,4 +168,4 @@ if [ "${exit_code}" != "0" ]; then
   exit 1
 fi
 
-echo "OK: image boots read-only as uid 10001, serves /health, and stops gracefully"
+echo "OK: image boots read-only as uid 10001, serves /health and /metrics, stops gracefully"

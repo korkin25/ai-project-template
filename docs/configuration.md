@@ -10,12 +10,23 @@ via the chart's `envFrom.secret`, and in CI from the host's own variable store (
 Update this file **in the same change** whenever you add or rename a runtime env var
 (Documentation-sync rule).
 
+**Do not expect the doc-sync gate to catch you.** It asks one question — did *any* file under
+`docs/`, `README`, `CHANGELOG`, `TODO`, `CLAUDE.md` or `AUTOPILOT-LOG.md` change alongside the
+code? — and it cannot ask whether the *right* doc changed. `APP_VERSION` and `GET /metrics`
+below both shipped with the gate green, because the same commit edited `CLAUDE.md`; they were
+undocumented for a release anyway. The gate stops a change that documents *nothing*. Only a
+reviewer stops one that documents the wrong thing, so read the table, not the check mark.
+
 ## Sample app (`app-serve`)
 
 | Variable | Default | Secret | Purpose |
 |----------|---------|:------:|---------|
 | `APP_HOST` | `0.0.0.0` | | Bind host for the HTTP service. |
 | `APP_PORT` | `8080` | | Bind port for the HTTP service. |
+| `APP_VERSION` | packaged `__version__` (`0.0.0`) | | The version reported by `GET /health` and by the `app_build_info` series on `GET /metrics`. **Set by the chart from `.Chart.AppVersion`**, i.e. the released SemVer — the image cannot know its own tag, so the packaged constant is only the fallback for a local run. An empty value is treated as unset: `APP_VERSION=""` from a ConfigMap key with no value would otherwise report a blank version that still looks like a valid response. |
+
+The chart sets it as a container `env` entry, never through `envFrom`, so nothing in a shared
+ConfigMap can shadow it — see `helm/templates/deployment.yaml`.
 
 ## Tests
 
