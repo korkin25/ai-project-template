@@ -22,6 +22,8 @@ spec:
       # reviews security posture. A workload that genuinely cannot comply is a design
       # decision (docs/architecture.md), not a values override.
 
+      # Named explicitly, never left to the namespace `default` — see serviceaccount.yaml.
+      serviceAccountName: {{ include "@@PROJECT@@.serviceAccountName" . }}
       # This workload never calls the Kubernetes API, so mounting its ServiceAccount token
       # only hands an attacker a credential (CKV_K8S_38).
       automountServiceAccountToken: false
@@ -90,6 +92,21 @@ spec:
           # chart to render an httpGet probe or an exec probe, never neither. With the
           # Service disabled the pod has no port to probe, so liveness falls back to proving
           # the interpreter and the package still load.
+          #
+          # All three are rendered, and the startup probe comes first for a reason: while it
+          # is running, liveness and readiness are suspended, so a slow boot cannot be
+          # mistaken for a hang and killed halfway through.
+          startupProbe:
+            {{- if .Values.service.enabled }}
+            httpGet:
+              path: {{ .Values.probes.path }}
+              port: http
+            {{- else }}
+            exec:
+              command: ["python", "-c", "import @@PKG@@; import sys; sys.exit(0)"]
+            {{- end }}
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
           livenessProbe:
             {{- if .Values.service.enabled }}
             httpGet:

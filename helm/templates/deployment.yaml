@@ -28,14 +28,35 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      # THE HARDENING BELOW IS NOT A VALUES KNOB, ON PURPOSE — only the uid/gid are, because
+      # those are a fact about the image. runAsNonRoot makes the kubelet REFUSE to start an
+      # image that resolves to uid 0, which survives a bad rebuild of the Dockerfile;
+      # seccompProfile RuntimeDefault narrows the syscall surface.
       securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+        runAsNonRoot: true
+        runAsUser: {{ .Values.runtimeUser.uid }}
+        runAsGroup: {{ .Values.runtimeUser.gid }}
+        fsGroup: {{ .Values.runtimeUser.fsGroup }}
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: {{ .Chart.Name }}
           image: {{ include "app.image" . }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # `drop: [ALL]` rather than a list of named capabilities, so a capability added to
+          # a future default set is dropped too.
           securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: {{ .Values.runtimeUser.uid }}
+            runAsGroup: {{ .Values.runtimeUser.gid }}
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
           {{- with .Values.command }}
           command:
             {{- toYaml . | nindent 12 }}
@@ -48,12 +69,25 @@ spec:
             - name: http
               containerPort: {{ .Values.containerPort }}
               protocol: TCP
+          env:
+            # From the CHART, because the chart is the only thing that knows the released
+            # SemVer (CI writes it into appVersion at package time) — the image cannot know
+            # its own tag. /health and /metrics both report it. A container `env` entry wins
+            # over anything of the same name in `envFrom`, so this cannot be shadowed.
+            - name: APP_VERSION
+              value: {{ .Chart.AppVersion | quote }}
           envFrom:
             - configMapRef:
                 name: {{ include "app.fullname" . }}-env
+            {{- range .Values.envFrom.configMaps }}
+            - configMapRef:
+                name: {{ . }}
+                optional: true
+            {{- end }}
             {{- if .Values.envFrom.secret.enabled }}
             - secretRef:
                 name: {{ .Values.envFrom.secret.name | default (printf "%s-secrets" (include "app.fullname" .)) }}
+                optional: true
             {{- end }}
           {{- if .Values.livenessProbe.enabled }}
           livenessProbe:

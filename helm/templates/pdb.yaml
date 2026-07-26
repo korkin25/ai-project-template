@@ -1,4 +1,7 @@
 {{- if .Values.podDisruptionBudget.enabled -}}
+{{- if and (not .Values.podDisruptionBudget.maxUnavailable) (ge (int .Values.podDisruptionBudget.minAvailable) (int .Values.replicaCount)) }}
+{{- fail "podDisruptionBudget.minAvailable must be below replicaCount — a budget that already equals the replica count blocks every voluntary eviction, so node drains and cluster upgrades hang forever with nothing red on this release" }}
+{{- end }}
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:

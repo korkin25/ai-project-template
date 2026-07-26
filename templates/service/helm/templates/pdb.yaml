@@ -1,0 +1,24 @@
+{{- if .Values.podDisruptionBudget.enabled }}
+{{- if and (not .Values.podDisruptionBudget.maxUnavailable) (ge (int .Values.podDisruptionBudget.minAvailable) (int .Values.replicaCount)) }}
+{{- fail "podDisruptionBudget.minAvailable must be below replicaCount — a budget that already equals the replica count blocks every voluntary eviction, so node drains and cluster upgrades hang forever with no error on this release" }}
+{{- end }}
+# What a node drain is allowed to take. The failure mode a PDB prevents is a cluster upgrade
+# evicting every replica of this service at the same moment; the failure mode a WRONG PDB
+# causes is the opposite — a drain that never completes — which is why the guard above
+# refuses a budget that leaves the scheduler no room at all.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "@@PROJECT@@.fullname" . }}
+  labels:
+    {{- include "@@PROJECT@@.labels" . | nindent 4 }}
+spec:
+  {{- if .Values.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.podDisruptionBudget.maxUnavailable }}
+  {{- else }}
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "@@PROJECT@@.selectorLabels" . | nindent 6 }}
+{{- end }}

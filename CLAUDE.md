@@ -1,7 +1,7 @@
 <!-- GENERATED FILE — DO NOT EDIT.
      Sources : standard/base.md + standard/profiles/service.md + standard/repo.env
      Profile : service
-     Sources-SHA256: 38065d58d984d3283826f3fe8fb4f81f64511077fc45cfc4575fcd6bbdcc44cf
+     Sources-SHA256: ee72cc48cf857725c4dc1bdfde469fa80a4289979f56793244a2617369130ae0
      Regenerate: ./standard/compose.sh
      Edit the sources, never this file. CI fails a change where the two disagree.
 -->
@@ -752,16 +752,146 @@ depend on them:
 
 ## Chart contract
 
+The chart is the only thing standing between the image and the cluster, and it is reviewed by
+people who will never open the templates. Every rule below is one a reviewer can check by
+reading `values.yaml` and running `helm template`.
+
+### Version and image
+
 - `Chart.yaml` `version`/`appVersion` are **placeholders**; CI overwrites both with
-  `GitVersion_SemVer`. Never hand-edit them.
+  `GitVersion_SemVer`. Never hand-edit them — but keep them valid SemVer, or the chart stops
+  rendering locally.
 - `values.yaml` `image.repository` and `image.tag` are likewise CI-written. A human-set image
-  tag in a chart is always a bug.
-- The chart carries **defaults only**. Per-environment values live in the platform repo,
-  never here — this chart must render for any environment.
-- The chart never templates a secret value. Secrets arrive by reference to an existing
-  Secret.
-- Resource requests and limits are set. `resources: {}` is not acceptable for a service that
-  runs in a shared cluster.
+  tag in a chart is always a bug: it decouples the chart version from the code it deploys,
+  and nothing fails until the wrong build ships.
+- The chart passes `.Chart.AppVersion` into the container (`APP_VERSION` or equivalent),
+  because **the image cannot know its own tag**. `/health` and `/metrics` must report the
+  released version, not a constant frozen at build time. Set it as a container `env` entry so
+  nothing in `envFrom` can shadow it.
+- `helm.sh/chart` and `app.kubernetes.io/version` carry that version into metadata, so
+  `kubectl get deploy --show-labels` answers "what is running here?" without the platform
+  repo. **Selector labels are a strict subset and never carry a version**: a Deployment's
+  selector is immutable, so a version there makes every upgrade fail with "field is
+  immutable" and forces a delete/recreate — an outage per release.
+
+### Scope — what may and may not be in the chart
+
+- **Defaults only.** Per-environment values live in the platform repo, never here. This chart
+  must render for *any* environment, so nothing in `values.yaml` names a cluster, a domain, a
+  namespace or an environment.
+- **Never a secret value.** Secrets arrive by reference to a Secret that already exists in the
+  namespace. A rendered secret lands in the release manifest, in cluster state, and in every
+  `helm get values` output.
+- **No coupling to a GitOps controller or a secrets operator.** What applies the release is
+  the platform repo's business, not the chart's.
+- **No NetworkPolicy.** Namespace traffic policy is the infra repo's; a per-service policy
+  fighting the cluster default is how a service loses its egress on a Friday.
+
+### Configuration
+
+- Env arrives via `envFrom`: the namespace-wide ConfigMap the platform provides, plus this
+  service's own Secret, **both referenced by name**. The shared ConfigMap is `optional: true`
+  — one that has not been created in this namespace yet otherwise wedges the pod in
+  `CreateContainerConfigError`, which names no cause.
+- Values the chart itself owns may render inline in the pod spec or into a chart-owned
+  ConfigMap. **A chart-owned ConfigMap requires a `checksum/…` pod annotation over it.**
+  Without one, a values change rewrites the ConfigMap and no pod ever re-reads it: the release
+  reports success while the old configuration keeps running. Inline env needs no checksum — it
+  is already part of the pod template, so changing it rolls the pods by itself.
+- Every variable the chart sets appears in `docs/configuration.md`.
+
+### Hardening — fixed in the template, not a values knob
+
+The *Runtime contract* says what must be true of the container. The chart's obligation is that
+**none of it is overridable**: `runAsNonRoot`, `readOnlyRootFilesystem`,
+`allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]` and
+`seccompProfile: RuntimeDefault`, at pod *and* container level, written into the template.
+Exposed as values, one line in one environment's bundle weakens the whole set, in a repo where
+nobody reviews security posture. A workload that genuinely cannot comply is a decision
+recorded in `docs/architecture.md`, not an override.
+
+Only uid/gid/fsGroup are values, because they are a fact about the image and must match
+`deploy/Dockerfile`. `drop: [ALL]`, never a list of named capabilities — so a capability added
+to a future default set is dropped too.
+
+`automountServiceAccountToken: false` unless the service really calls the Kubernetes API; the
+mounted token is otherwise just a credential waiting to be found.
+
+### Probes
+
+- **All three are rendered.** `startupProbe` guards the boot, `readinessProbe` removes an
+  endpoint, `livenessProbe` kills a container. Without a startup probe the only way to survive
+  a slow boot is a long liveness `initialDelaySeconds`, which then delays detection of a real
+  hang for the rest of the pod's life.
+- Readiness reacts fast, liveness slowly. The costs are not symmetric: one withdraws traffic,
+  the other destroys a process mid-work.
+- A service with no HTTP surface renders **exec** probes instead — one or the other, never
+  neither. A Deployment with no probe reports Ready the moment the process starts, so a
+  rollout of a broken build completes green.
+- `terminationGracePeriodSeconds` is at least the shutdown budget the process needs. Shorter,
+  and the graceful shutdown the runtime contract promises is a fiction the pod never finishes.
+
+### Resources and disruption
+
+- Requests **and** limits are set. `resources: {}` is not acceptable for a service on a shared
+  cluster: with no request the scheduler treats the pod as free and packs nodes until
+  something is OOM-killed; with no limit one leaking pod evicts its neighbours. The numbers
+  are a starting point to be measured, not a permanent guess.
+- A `PodDisruptionBudget` is templated, and enabled for anything above one replica — a node
+  drain otherwise takes every replica at once, a voluntary outage nobody chose. A budget that
+  leaves no room (`minAvailable` ≥ `replicaCount`) is the opposite failure: drains and cluster
+  upgrades hang forever with nothing red on the release. Reject it at render time.
+- If the chart templates an `HorizontalPodAutoscaler`, `replicaCount` stops being the source
+  of truth; a chart that keeps asserting both fights itself on every reconcile.
+
+### Networking
+
+- External access is a Gateway API **`HTTPRoute`, never an `Ingress`.** Ingress is
+  feature-frozen upstream and every non-trivial behaviour lives in controller-specific
+  annotations, which makes the manifest unportable and unreviewable.
+- **Off by default.** Most services expose nothing, and a worker reachable from the internet
+  by accident is an incident — defaults are what people forget to change.
+- `parentRefs` has **no default**, and rendering **fails loudly** when the route is enabled
+  without one, or without a Service to send traffic to. An HTTPRoute with no parent is
+  accepted by the API server and then routes nothing: `Accepted=False`, no event on the
+  Deployment, no error anywhere a human is looking.
+- The Service is `ClusterIP`. A per-service LoadBalancer or NodePort bypasses the gateway's
+  TLS, auth and rate limiting, and is invisible in the routing config someone reads when
+  asking "what is exposed?".
+- Ports are targeted **by name**, so the container port can move without an edit in every
+  consumer of the Service.
+
+### Identity and registry
+
+- The chart creates **its own ServiceAccount** (name overridable). Sharing the namespace
+  `default` account means the first RBAC role or cloud workload identity bound to it is
+  silently granted to every pod in the namespace.
+- `imagePullSecrets` are referenced **by name only** — the Secret is the infra repo's to
+  provision, and a chart that templates one has templated a credential.
+
+### Observability
+
+- The chart ships a `ServiceMonitor` (or the equivalent scrape config), enabled wherever a
+  metrics backend exists — see *Observability*.
+- **The scrape path must be one the service actually serves, and the port is the Service
+  port's name, not a number.** A `ServiceMonitor` aimed at an endpoint that 404s is a scrape
+  target that fails silently: the panels stay empty and nobody is told why. The `/metrics`
+  handler and the `ServiceMonitor` land in the **same change**; neither is allowed to exist
+  alone.
+
+### CRD-backed resources
+
+`HTTPRoute` and `ServiceMonitor` need CRDs that `helm lint` cannot see. Off means absent, not
+degraded — but turning one on adds a cluster prerequisite, and a release templating a kind
+whose CRD is missing fails at **apply** time, not at lint time. The prerequisite is declared
+in the platform's `requirements.yaml` like any other capability; the chart only reads the flag.
+
+### Gate
+
+CI runs `helm lint` and `helm template` on every ref, and renders the chart **with the
+optional features on**, not only with defaults — a template exercised only by its defaults is
+untested for every environment that turns something on. `fail` guards are how a
+misconfiguration becomes a red pipeline instead of a resource that exists and does nothing.
 
 ## Release
 

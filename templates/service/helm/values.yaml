@@ -39,10 +39,28 @@ service:
   type: ClusterIP
   port: 8080
 
+# The chart creates its own ServiceAccount rather than using the namespace `default`. With
+# a dozen services sharing one account, the first service that needs an RBAC role or a cloud
+# workload identity grants it to every pod in the namespace, and nothing records that it did.
+serviceAccount:
+  create: true
+  # Extra annotations, e.g. the cloud IAM role a workload identity binds to.
+  annotations: {}
+  # Empty ⇒ the service's own name. Set only to adopt an account the infra repo owns.
+  name: ""
+
 probes:
   path: /health
   # Generous initialDelay + low failureThreshold on readiness, longer on liveness: readiness
   # should react fast (it only removes an endpoint), liveness slowly (it kills a container).
+  #
+  # The STARTUP probe is what makes those two settings honest. Without it the only way to
+  # survive a slow boot is a long liveness initialDelaySeconds, which then delays detection
+  # of a real hang for the whole life of the pod. failureThreshold × periodSeconds is the
+  # total boot budget; liveness and readiness do not run until it succeeds.
+  startup:
+    periodSeconds: 3
+    failureThreshold: 30
   liveness:
     initialDelaySeconds: 15
     periodSeconds: 20
@@ -51,6 +69,14 @@ probes:
     initialDelaySeconds: 5
     periodSeconds: 10
     failureThreshold: 3
+
+# A node drain evicts pods; without a budget it can take every replica of this service at
+# once, which is a voluntary outage nobody chose. Enable it for anything above one replica.
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  # Set one OR the other. maxUnavailable wins when non-empty.
+  maxUnavailable: ""
 
 # Gateway API HTTPRoute — NOT an Ingress. Ingress is frozen upstream; Gateway API is the
 # supported path for anything new, and the cluster's Gateway is owned by the infra repo.

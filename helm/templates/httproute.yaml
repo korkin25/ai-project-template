@@ -1,4 +1,10 @@
 {{- if .Values.gatewayApi.enabled -}}
+{{- if not .Values.gatewayApi.parentRefs }}
+{{- fail "gatewayApi.enabled=true requires gatewayApi.parentRefs — an HTTPRoute with no parentRef is accepted by the API server and then silently routes nothing" }}
+{{- end }}
+{{- if not .Values.service.enabled }}
+{{- fail "gatewayApi.enabled=true requires service.enabled=true — an HTTPRoute needs a Service to send traffic to" }}
+{{- end }}
 # Gateway API HTTPRoute — attach the service to an existing Gateway. Preferred over Ingress.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

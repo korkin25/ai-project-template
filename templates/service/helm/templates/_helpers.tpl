@@ -15,6 +15,14 @@ NetworkPolicy selectors, runbooks). The resource is called what the service is c
 {{- printf "%s" (include "@@PROJECT@@.name" .) | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
+{{- define "@@PROJECT@@.serviceAccountName" -}}
+{{- if .Values.serviceAccount.create -}}
+{{- default (include "@@PROJECT@@.fullname" .) .Values.serviceAccount.name -}}
+{{- else -}}
+{{- default "default" .Values.serviceAccount.name -}}
+{{- end -}}
+{{- end -}}
+
 {{/*
 Full label set for metadata. `helm.sh/chart` carries the chart version, which after
 packaging IS the released SemVer — so `kubectl get deploy -o wide --show-labels` answers

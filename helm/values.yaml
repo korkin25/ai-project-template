@@ -39,18 +39,22 @@ automountServiceAccountToken: false
 podAnnotations: {}
 podLabels: {}
 
-podSecurityContext:
+# The uid/gid the image was built with (deploy/Dockerfile creates 10000:10000). These are
+# values because they are a FACT ABOUT THE IMAGE, and an adopter's image may differ.
+#
+# The hardening around them is NOT a value — runAsNonRoot, readOnlyRootFilesystem,
+# allowPrivilegeEscalation, capabilities.drop and seccompProfile are fixed in
+# templates/deployment.yaml. Exposing them would let one line in one environment's bundle
+# weaken the whole set, in a repo where nobody reviews security posture. A workload that
+# genuinely cannot comply is a decision for docs/architecture.md, not a values override.
+runtimeUser:
+  uid: 10000
+  gid: 10000
   fsGroup: 10000
 
-securityContext:
-  allowPrivilegeEscalation: false
-  readOnlyRootFilesystem: true
-  runAsNonRoot: true
-  runAsUser: 10000
-  runAsGroup: 10000
-  capabilities:
-    drop:
-      - ALL
+# The budget SIGTERM handling gets before Kubernetes SIGKILLs the container: stop intake,
+# finish in-flight work, exit. Too short and graceful shutdown is a fiction.
+terminationGracePeriodSeconds: 30
 
 containerPort: 8080
 
@@ -58,13 +62,24 @@ env:
   APP_HOST: "0.0.0.0"
   APP_PORT: "8080"
 
-# Extra env from an existing Secret (create it out-of-band; the chart never templates values).
 envFrom:
+  # Namespace-wide configuration the platform provides (broker endpoints, database hosts),
+  # referenced by name only. Rendered with `optional: true`: a ConfigMap that has not been
+  # created in this namespace yet otherwise wedges the pod in CreateContainerConfigError,
+  # which names no cause.
+  configMaps: []
+  #  - platform-config
+  # This service's own secret, created out-of-band. The chart never templates a secret
+  # VALUE — a rendered secret ends up in the release manifest, in cluster state, and in
+  # every `helm get values` output.
   secret:
     enabled: false
     name: ""
 
-# The sample app exposes GET /health.
+# The sample app serves GET /health and GET /metrics (src/app/server.py). All three probes
+# are rendered on purpose: startup guards the boot, readiness withdraws traffic, liveness
+# kills the container. With only the last two, the only way to survive a slow boot is a long
+# liveness initialDelaySeconds — which then delays detection of a real hang forever after.
 livenessProbe:
   enabled: true
   httpGet:
@@ -108,10 +123,14 @@ service:
 # Attach to an existing Gateway (set parentRefs); no controller-specific annotations needed.
 gatewayApi:
   enabled: false
-  parentRefs:
-    - name: ""          # e.g. shared-gateway
-      namespace: ""     # e.g. networking (omit for same namespace)
-      sectionName: ""   # e.g. https (the listener name)
+  # No default, and rendering FAILS when the route is enabled without one: an HTTPRoute with
+  # no parentRef is accepted by the API server and then silently routes nothing — it sits at
+  # Accepted=False with no event on the Deployment. Only the platform's per-environment
+  # values know which Gateway (and which listener) exists in that cluster.
+  parentRefs: []
+  #  - name: shared-gateway
+  #    namespace: networking   # omit for the same namespace
+  #    sectionName: https      # the listener name
   hostnames: []         # e.g. [app.example.com]
   rules:
     - matches:
@@ -120,24 +139,41 @@ gatewayApi:
             value: /
       backendPort: 80   # Service port; defaults to service.port
 
+# Prometheus Operator scrape. `path` MUST be a path the service actually serves (the sample
+# serves /metrics — see src/app/server.py); a ServiceMonitor pointing at a 404 is a scrape
+# target that fails silently, and the first symptom is an empty panel nobody can explain.
 serviceMonitor:
   enabled: false
   path: /metrics
   interval: 30s
   labels: {}
 
+# When this is on, `replicaCount` above stops being the source of truth — the HPA owns the
+# replica count and a chart that keeps setting both fights itself on every reconcile.
 autoscaling:
   enabled: false
   minReplicas: 1
   maxReplicas: 3
   targetCPUUtilizationPercentage: 80
 
+# Enable for anything running more than one replica: without a budget a node drain can evict
+# every replica at once — a voluntary, entirely avoidable outage.
 podDisruptionBudget:
   enabled: false
   minAvailable: 1
   maxUnavailable: ""
 
-resources: {}
+# Requests AND limits, always. `resources: {}` is not acceptable on a shared cluster: with no
+# request the scheduler treats the pod as free and packs nodes until something is OOM-killed;
+# with no limit one leaking pod evicts its neighbours. These numbers are a starting point to
+# be measured and adjusted per service, not a permanent guess.
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
 
 nodeSelector: {}
 tolerations: []
