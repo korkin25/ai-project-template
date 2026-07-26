@@ -1,0 +1,48 @@
+# Local gates mirroring CI. In this repo the feedback loop for a mistake is not a red
+# pipeline — it is an environment, so the cheap checks are worth running before the commit
+# exists.
+#
+# One-time setup per clone:
+#   pip install pre-commit && pre-commit install
+#
+# Hook versions are PINNED — a hook is code from another repository executed against this
+# checkout, and this checkout decides what runs in every environment.
+repos:
+  - repo: https://github.com/adrienverge/yamllint
+    rev: "v1.37.1"
+    hooks:
+      - id: yamllint
+        args: ["-c", ".yamllint"]
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: "v8.30.1"
+    hooks:
+      # The most valuable hook in a platform repo. Every credential here is a *reference*
+      # resolved in-cluster, so a literal value in a values file is always a mistake — and
+      # always an effective one, which is why it is tempting under deadline.
+      - id: gitleaks
+
+  - repo: https://github.com/bridgecrewio/checkov
+    rev: "3.3.8"
+    hooks:
+      - id: checkov
+        # pass_filenames: false — checkov reasons across resources (the CKV2_* checks), and
+        # handed only the changed files it silently loses exactly those.
+        always_run: true
+        pass_filenames: false
+        args: ["--config-file", ".checkov.yaml"]
+
+  - repo: local
+    hooks:
+      # The schema gate, run before the commit rather than after the push. A bundle typo is
+      # cheap here and expensive in review: `additionalProperties: false` means an unknown key
+      # is rejected, which is the whole reason a typo cannot become a silent no-op deployment.
+      - id: validate-bundles
+        name: validate bundles against bundle.schema.json
+        entry: python3 scripts/validate-bundles.py
+        language: python
+        additional_dependencies: ["pyyaml", "jsonschema"]
+        # Runs once for the tree, not per file: the script's cross-file checks (a namespace
+        # used twice, an orphaned values file) cannot see anything from a single path.
+        pass_filenames: false
+        files: '^(clusters/|bundle\.schema\.json$)'

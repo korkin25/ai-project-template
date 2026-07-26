@@ -4,7 +4,7 @@
 #
 # `example-cluster`, `example-platform` and `example-service` are scaffold names. Rename the
 # cluster directory to your real kubecontext and these values to your platform's, in one
-# change. They are literal strings rather than `@@TOKEN@@` placeholders because
+# change. They are literal strings rather than substituted scaffold tokens because
 # `bundle.schema.json` constrains `name` and `namespace` to DNS labels, and
 # `validate-bundles.py` requires the bundle name to contain the environment directory name —
 # a placeholder carrying `@` or `<` would fail this repo's own gate on the first pipeline.

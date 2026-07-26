@@ -1,0 +1,33 @@
+# Credentials and cluster access — NEVER commit. This repo deploys into real environments and
+# every value it needs is a REFERENCE resolved in-cluster by the secrets operator, so anything
+# matched below is by definition something that should not exist here at all. A secret that
+# reached a remote branch is compromised even after a force-push; gitleaks runs as a
+# pre-commit hook and again in CI because "just for a minute" is how it happens.
+*.kubeconfig
+kubeconfig*
+.e2e-kubeconfig
+.env
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+!ca-bundle.crt
+secrets.*
+vault-token
+
+# Rendered output. Never committed: the bundle is the source, the render is derived, and a
+# stale committed render is a second source of truth that reviews perfectly well.
+rendered/
+*.rendered.yaml
+
+# Python — scripts/ are standalone executables, but they still leave these behind.
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store

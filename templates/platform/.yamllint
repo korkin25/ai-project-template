@@ -1,0 +1,45 @@
+# yamllint — the first gate a change to this repo passes.
+#
+# The rules are chosen along one axis: STRICT about anything that silently changes MEANING,
+# lenient about anything that is merely style. This repo IS YAML: the bundle, the values and
+# the raw manifests are read by controllers that will happily accept a well-formed document
+# saying something other than what was written — `key: yes` becomes the boolean True, a
+# duplicate key silently discards the first value, and `mode: 0644` is the integer 420.
+extends: default
+
+ignore: |
+  .venv/
+  rendered/
+  .git/
+
+rules:
+  # Style, not meaning: a long URL in a values file or a long comment is not worth a red
+  # pipeline. Warned, not failed.
+  line-length:
+    max: 120
+    level: warning
+  # Bundles and manifests are written both with and without it; forcing one produces churn
+  # in a tree whose diffs are read constantly.
+  document-start: disable
+  # Comment indentation trips over the block-scalar comments used throughout .gitlab-ci.yml.
+  comments-indentation: disable
+  # THE IMPORTANT ONE. Unquoted yes/no/on/off are booleans in YAML 1.1, which many parsers
+  # still implement. A chart value that happens to read as `no` becomes `false`, and the
+  # release is installed with a setting nobody wrote.
+  truthy:
+    allowed-values: ["true", "false"]
+    check-keys: false
+  # A duplicate key does not error in YAML — the last one silently wins. In a values file
+  # that is a setting someone believes they made and did not, and it survives every review
+  # because both lines are individually correct.
+  key-duplicates: enable
+  octal-values:
+    # `mode: 0644` is an integer in YAML; a chart expecting a string then gets 420. This
+    # catches that whole class of file-permission bug before it reaches a pod.
+    forbid-implicit-octal: true
+    forbid-explicit-octal: false
+  # values/common.yaml uses inline flow mappings for resource requests, where the compact
+  # form is genuinely more readable than four lines each.
+  braces:
+    min-spaces-inside: 0
+    max-spaces-inside: 1

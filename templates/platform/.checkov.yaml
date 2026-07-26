@@ -1,0 +1,25 @@
+# Checkov configuration for @@PROJECT@@.
+#
+# Read by both the pre-commit hook and the CI SAST job (checkov auto-loads .checkov.yaml from
+# the working directory), so a finding cannot be clean locally and red in CI.
+#
+# What checkov can actually see in a platform repo is narrower than in an infra one, and
+# saying so here prevents the two mistakes that follow from misreading its report: the
+# workloads are deployed by CHARTS, which live in the service repos — checkov never sees them
+# from here. What it does see is the raw resources under clusters/**/manifests/ (database
+# clusters, topics, ExternalSecrets) and the values that configure the charts, and both are
+# worth scanning: a permissive value here is applied to a real environment.
+#
+# The corollary: a clean report from this repo is NOT a statement that what is deployed is
+# secure. That statement is made by each service repo's own scan of its own chart.
+#
+# EVERY SKIP NEEDS A REASON, and "the finding was inconvenient" is not one. A check that does
+# not apply is a decision worth writing in docs/architecture.md.
+directory:
+  - .
+compact: true
+quiet: true
+skip-path:
+  # Rendered output is derived from the bundle and never committed; if a local render is
+  # sitting in the tree, scanning it duplicates every finding under a path nobody can fix.
+  - rendered/
