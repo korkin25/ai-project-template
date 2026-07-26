@@ -577,22 +577,21 @@ That premise decides everything about how an entry is written:
 - **Name paths, commands, versions and identifiers in full.** A future reader cannot ask a
   follow-up question.
 
-### Write it before the work is finished, not after
+### Small steps are the protection — not a running journal
 
-The failure this prevents is the common one: a session dies **mid-change**, and because the
-entry was going to be written at the end, nothing was written at all. The next session finds a
-half-migrated repository, an uncommitted working tree, or a branch whose purpose nobody can
-infer — and has to reconstruct intent from a diff, which is the one thing a diff cannot carry.
+The obvious reaction to "the session may vanish" is to journal continuously, in case. Do not.
+A log written as insurance fills with half-thoughts nobody can act on, and the reader who
+actually needs it has to sift them.
 
-So: for anything that will take more than a few steps, open the entry **when you start**, with
-what you are doing and why, and fill in the verification when it lands. An entry that says
-*"in progress: extracting the shared library; imports rewritten, tests not yet ported"* is
-worth more than a perfect entry that was never written.
+**The real protection is step size.** Commit in small logical units, push after each, and
+write the entry when a step lands. Then a lost session costs exactly the step in flight —
+which is an acceptable loss, and cheaper than the discipline required to avoid it. A step
+whose loss would be expensive is not a step; it is several, and the fix is to split it.
 
-**Record in-flight state explicitly** — what is committed, what is only in the working tree,
-what is pushed, what is half-done and where the seam is. Committed work is recoverable from
-git; work that exists only in a session is not, and a note saying it existed is the difference
-between redoing it deliberately and discovering it by accident.
+**Record in-flight state when a step actually lands** — branch, what is committed, what is
+pushed, what exists only in the working tree. Committed and pushed work is recoverable by
+anyone with the repository; work that exists only in a session is not. One line stating which
+is which is what lets the next session resume rather than re-derive.
 
 Write an entry for any autonomous change of substance: a feature, a refactor, a CI change, a
 decision taken, or a blocker discovered. Trivial typo fixes do not need one.
