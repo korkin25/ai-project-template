@@ -17,16 +17,30 @@ image:
   # pipeline built and pushed. A hand-set image tag in a chart is always a bug: it decouples
   # the chart version from the code it deploys, and it is invisible until the wrong build
   # ships. Whatever is written here is only what a local `helm template` shows.
-  repository: registry.gitlab.com/@@GROUP@@/@@PROJECT@@
+  #
+  # @@REGISTRY@@ is a SCAFFOLD PLACEHOLDER, substituted when this template is instantiated —
+  # the registry host of the repo being created (`ghcr.io`, `registry.gitlab.com`, a private
+  # Harbor). A token rather than a default on purpose: this standard is host-agnostic, and a
+  # default naming one host is exactly the sort of value that survives adoption unread and is
+  # then discovered in a cluster, as a pull failure against somebody else's registry.
+  #
+  # Quoted because `@` is a reserved YAML indicator and may not open a plain scalar — the
+  # same reason Chart.yaml quotes its name.
+  repository: "@@REGISTRY@@/@@GROUP@@/@@PROJECT@@"
   tag: "0.0.0"
   # IfNotPresent, not Always: deployments reference an immutable, CI-produced tag, so
   # re-pulling on every restart buys nothing and costs an outage when the registry is down.
   pullPolicy: IfNotPresent
 
-# The pull secret for registry.gitlab.com. Provisioned in the namespace by the infra repo,
-# referenced here by name only.
+# The pull secret for @@REGISTRY@@. Provisioned in the namespace by the infra repo and
+# referenced here by NAME ONLY — the chart never templates a credential.
+#
+# @@PULL_SECRET@@ is a scaffold placeholder for the same reason @@REGISTRY@@ is, and it is
+# the one that fails least helpfully: the secret's name is chosen by whoever runs the
+# cluster, so a wrong default renders perfectly, passes `helm lint`, and surfaces as an
+# ImagePullBackOff whose message names the image and never the secret that was missing.
 imagePullSecrets:
-  - name: gitlab-registry
+  - name: "@@PULL_SECRET@@"
 
 nameOverride: ""
 

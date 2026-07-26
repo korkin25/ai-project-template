@@ -28,11 +28,21 @@ container image and a Helm chart, at the same version — and it never deploys i
 
 1. Replace every placeholder: `@@PROJECT@@` (hyphenated repo/image/chart name), `@@PKG@@`
    (underscored Python package, also the `src/@@PKG@@/` directory), `@@PREFIX@@` (ticket
-   prefix), `@@GROUP@@` (GitLab namespace), `@@DESCRIPTION@@`,
+   prefix), `@@GROUP@@` (namespace that owns the repo), `@@DESCRIPTION@@`,
    `@@CI_TEMPLATES_PROJECT@@` (the shared CI templates repo, as a GitLab project path),
-   `@@CI_TEMPLATES_REF@@` (the tag of it to pin) and `@@RUNNER_TAG@@` (the tag of your
-   runner fleet — it appears in four blocks of `.gitlab-ci.yml` that must stay in sync).
-   `grep -rnE '@{2}' .` must come back empty when you are done.
+   `@@CI_TEMPLATES_REF@@` (the tag of it to pin), `@@RUNNER_TAG@@` (the tag of your
+   runner fleet — it appears in four blocks of `.gitlab-ci.yml` that must stay in sync),
+   `@@REGISTRY@@` (the registry host your images are published to — `ghcr.io`,
+   `registry.gitlab.com`, a private Harbor) and `@@PULL_SECRET@@` (the name of the
+   `kubernetes.io/dockerconfigjson` Secret the infra repo provisions in each namespace for
+   that registry). `grep -rnE '@{2}' .` must come back empty when you are done.
+
+   The last two are tokens rather than defaults on purpose. **This standard names no host**:
+   the same scaffold has to produce a GitHub/GHCR repo and a GitLab/`registry.gitlab.com`
+   repo, so a value shipped here would be right for one group and quietly wrong for the
+   other. Both are also the sort of value nothing checks — a chart pointing at the wrong
+   registry renders, lints and packages perfectly, and is first contradicted by a pod in
+   `ImagePullBackOff` whose message names the image and never the missing secret.
 2. Run `./standard/compose.sh` to generate `CLAUDE.md`, and commit it.
 3. Set `next-version` in `GitVersion.yml` to the first version you intend to release.
 4. Push to `dev` and read the pipeline logs — including the green jobs.

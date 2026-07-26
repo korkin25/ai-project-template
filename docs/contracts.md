@@ -96,11 +96,17 @@ to open `@@PROJECT@@`.
 
 The invariant it imposes is easy to break by accident and worth stating outright:
 
-> Tokens `compose.sh` does not know — today `@@CI_TEMPLATES_PROJECT@@`, `@@CI_TEMPLATES_REF@@`
-> and `@@RUNNER_TAG@@` — may appear **only under `templates/`**, never under `standard/`.
+> Tokens `compose.sh` does not know — today `@@CI_TEMPLATES_PROJECT@@`, `@@CI_TEMPLATES_REF@@`,
+> `@@RUNNER_TAG@@`, `@@REGISTRY@@` and `@@PULL_SECRET@@` — may appear **only under
+> `templates/`**, never under `standard/`.
 
 They are scaffold-instantiation tokens, substituted by whoever creates the new repo, not by
-the generator. Writing one into `standard/**` does not fail here — this repo regenerates
+the generator. Each scaffold's `README.md` lists the ones it uses, and the check that they
+were all resolved is `grep -rnE '@{2}' .` in the new repo — the scaffold-level equivalent of
+the generator's hard fail below. The two newest, `@@REGISTRY@@` and `@@PULL_SECRET@@`, are
+deliberately *not* `repo.env` keys: `compose.sh` writes `CLAUDE.md` and nothing else, so a
+key added there would be read by no one while implying the generator resolves it, and adding
+a required key breaks every existing `repo.env` at once (see the table above). Writing one into `standard/**` does not fail here — this repo regenerates
 against its own `repo.env` just fine only if the token happens to be known — it fails in
 every consuming repo at once, on their next regeneration, as an error about a token they
 never wrote. Teaching `compose.sh` a new token is therefore a prerequisite of using it in

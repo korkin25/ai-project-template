@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-# Image for @@PROJECT@@ -> registry.gitlab.com/@@GROUP@@/@@PROJECT@@
+# Image for @@PROJECT@@ -> @@REGISTRY@@/@@GROUP@@/@@PROJECT@@
 #
 # Path is deploy/Dockerfile because that is the shared templates' DOCKERFILE default
 # (globals.yml); keeping it there means .gitlab-ci.yml needs no override.
