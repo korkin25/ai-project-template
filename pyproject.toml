@@ -40,7 +40,33 @@ packages = ["src/app"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+# Coverage is measured on every run, not only in CI. A threshold nobody sees until the
+# pipeline fails gets worked around; one that fails on the developer's machine gets fixed.
+addopts = "-q --cov=app --cov-report=term-missing --cov-fail-under=80"
+
+[tool.coverage.run]
+branch = true
+source = ["src/app"]
+
+[tool.coverage.report]
+show_missing = true
+# The floor is a RATCHET, not a target. It sits just under the current number so an ordinary
+# refactor does not fail the build, and it moves UP as coverage rises — never down to
+# accommodate a gap. Lowering it is a decision that belongs in CHANGELOG.md with a reason.
+#
+# History, so the number is not mistaken for arbitrary: this repo sat at 47% with `cli.py`
+# entirely untested, which is precisely why no honest threshold could be set — any value that
+# passed would have been chosen to accommodate the hole. Tests first, then the gate.
+fail_under = 80
+exclude_lines = [
+    "pragma: no cover",
+    # `if __name__ == "__main__":` cannot execute under pytest, so counting it as a miss
+    # penalises every module that has an entry point and teaches people to delete the guard.
+    'if __name__ == "__main__":',
+    # An abstract method's body is a contract, not behaviour; there is nothing to exercise.
+    "raise NotImplementedError",
+    "@(abc\\.)?abstractmethod",
+]
 
 [tool.ruff]
 target-version = "py311"
