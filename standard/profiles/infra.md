@@ -69,7 +69,9 @@ An infra repo has no unit tests worth the name; verification is the *state of th
 ## CI
 
 `.gitlab-ci.yml` includes `/globals.yml` and `/sast.yml` (checkov and gitleaks matter most
-here), plus linting for the provisioning tool in use. Pin `ref:` to a tag.
+here), plus linting for the provisioning tool in use. `ref:` follows the platform-wide choice recorded in the service profile — `main` today,
+because the shared templates repo has no usable tag. It is a recorded decision, not an
+oversight; check the tag actually carries every included file before changing it.
 
 CI **lints and validates only — it never applies.** A pipeline holding cluster-admin
 credentials is a larger risk than the manual step it saves.

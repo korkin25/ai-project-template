@@ -21,7 +21,9 @@ marker files are absent — nothing needs disabling.
 ## CI
 
 `.gitlab-ci.yml` includes `/globals.yml`, `/auto-semversioning.yml`, `/lint.yml`, `/sast.yml`,
-plus a publish job gated on the release branches. Pin `ref:` to a tag.
+plus a publish job gated on the release branches. `ref:` follows the platform-wide choice recorded in the service profile — `main` today,
+because the shared templates repo has no usable tag. It is a recorded decision, not an
+oversight; check the tag actually carries every included file before changing it.
 
 ## The public API is the contract
 
