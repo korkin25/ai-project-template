@@ -91,6 +91,20 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   resolution falls back to the commit SHA, which is strictly better. Recorded in
   `docs/contracts.md` so re-adding it — the natural instinct — is recognisable as the bug.
 
+- **A coverage floor that means something** (`PRJ-10`). It could not be set honestly before:
+  coverage sat at 47% with `cli.py` entirely untested, so any passing value would have been
+  one chosen to accommodate the hole. Tests first — `cli.py` 0% → 100%, total 47% → 83% with
+  branch coverage on — then the gate at 80, a ratchet just under the current number whose only
+  direction is up. Verified both ways: exit 0 at 80, exit 1 at 95.
+- **`templates/platform/` became a usable scaffold** (`PRJ-18`). It shipped eight files and no
+  `standard/repo.env`, so `compose.sh` could not run and a spawned platform repo had no
+  `CLAUDE.md` at all — the drift gate would guard nothing and doc-sync would have no doc side.
+  Eighteen files added, including the pipeline the profile describes and an `e2e/` directory,
+  because every other profile says tier (d) lives here and a test with no home lands in a
+  service repo instead. Verified by simulating adoption end to end.
+- **The canonical layout** (`PRJ-5`) — `deploy/Dockerfile` and `helm/`, which deleted both CI
+  overrides since the canon is what the shared templates already default to.
+
 ### Bookkeeping
 
 - `PRJ-13` was a duplicate of `PRJ-8` (observability), created by logging the same requirement
