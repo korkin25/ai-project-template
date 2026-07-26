@@ -12,7 +12,13 @@ ARG EXTRAS=""
 ENV PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 WORKDIR /src
-RUN python -m pip install --upgrade pip build
+# Pinned, and hadolint DL3013 is the reason it is worth pinning even here: an unpinned
+# build tool makes the image non-reproducible in the one place nobody looks — a pip or
+# build release can change wheel metadata and the failure surfaces as a runtime import
+# error in a rebuilt image that nobody edited.
+ARG PIP_VERSION=25.3
+ARG BUILD_VERSION=1.3.0
+RUN python -m pip install --upgrade "pip==${PIP_VERSION}" "build==${BUILD_VERSION}"
 COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
 RUN python -m build --wheel --outdir /dist \
@@ -47,6 +53,18 @@ ENV PATH="/opt/venv/bin:$PATH" \
 WORKDIR /app
 USER 10000
 EXPOSE 8080
+
+# CKV_DOCKER_2. This is NOT the Kubernetes probe — the chart has its own, and Kubernetes
+# ignores HEALTHCHECK entirely. It earns its place everywhere else the image runs: docker
+# compose, a plain `docker run` in the smoke test, a developer machine. Without it those
+# report a container as healthy the moment the process exists, which is exactly when it is
+# least likely to be serving.
+#
+# Uses python rather than curl deliberately: the runtime image is slim and ships neither
+# curl nor wget, and adding one for a healthcheck grows the attack surface of every
+# deployed container to save four lines here.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD ["python", "-c", "import os,urllib.request;urllib.request.urlopen(f'http://127.0.0.1:{os.environ.get(\"APP_PORT\",\"8080\")}/health', timeout=3)"]
 
 # Default: serve the HTTP service. Override CMD for your CLI/other entry points.
 ENTRYPOINT ["app-serve"]

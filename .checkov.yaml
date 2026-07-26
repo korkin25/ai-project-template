@@ -1,0 +1,34 @@
+# Checkov configuration for ai-project-template.
+#
+# Read by BOTH the local pre-commit hook and the CI SAST job — checkov auto-loads
+# .checkov.yaml from the working directory — so a finding cannot be clean locally and red in
+# CI, or vice versa. One skip list, reviewed in one place.
+#
+# The scaffold at templates/service/.checkov.yaml carries the same list for the same reasons.
+# This file existing here is not duplication for its own sake: without it the reference
+# implementation fails a gate its own scaffold passes, which is how a skip list gets copied
+# without anyone re-reading why each line is there.
+#
+# EVERY SKIP BELOW IS A CHECK A CHART *TEMPLATE* STRUCTURALLY CANNOT SATISFY — the value it
+# asks for is supplied at package or deploy time by CI, the GitOps controller, or the
+# platform's environment bundle. That is the only acceptable reason to skip a check here.
+# A skip added because a finding was inconvenient is a security decision made by whoever was
+# in a hurry; take it to docs/architecture.md as a recorded decision instead. Never delete a
+# check silently — the gate policy is that new scanners start soft and then harden, never
+# disappear.
+directory:
+  - .
+compact: true
+quiet: true
+skip-check:
+  - CKV_K8S_14   # image tag not pinned — helm-package.yml writes the real tag at package time
+  - CKV_K8S_15   # imagePullPolicy Always — releases use immutable CI-built SemVer tags, so
+                 # re-pulling an identical digest on every restart buys nothing and costs
+                 # a registry round trip on every node, including during an outage
+  - CKV_K8S_21   # default namespace — the namespace comes from the platform's release, and a
+                 # chart that hardcodes one cannot be deployed to two environments
+  - CKV_K8S_35   # secrets should be files — shared config arrives via envFrom by convention;
+                 # see the Configuration section of the service profile
+  - CKV_K8S_43   # image not digest-pinned — pinned by CI and the bundle at deploy time
+  - CKV2_K8S_6   # no NetworkPolicy — a cluster-wide concern owned by the infra repo. One per
+                 # service would fight the cluster default rather than compose with it
