@@ -33,9 +33,12 @@ them.
 | `tests/test_main.py::test_config_defaults_come_from_the_environment` | (a) | config is read from the environment, with the documented defaults | ✅ |
 | `tests/test_main.py::test_invalid_numeric_config_stops_the_process` | (a) | a malformed value fails startup instead of falling back | ✅ |
 | `tests/test_main.py::test_health_payload_has_status_and_version` | (a) | `/health` body carries at least `status` and `version` | ✅ |
+| `tests/test_main.py::test_metrics_endpoint_answers_200_in_prometheus_exposition_format` | (a) | `/metrics` answers `200` with the exposition `Content-Type` and a body carrying `# TYPE` — shape, not an exact payload | ✅ |
+| `tests/test_main.py::test_metrics_reports_the_version_health_reports` | (a) | `/metrics` and `/health` report one version, so a dashboard and a probe cannot disagree | ✅ |
+| `tests/test_main.py::test_metrics_counters_are_wired_to_the_worker` | (a) | the exposed counters move with the worker instead of reporting a flat zero | ✅ |
 | `tests/test_main.py::test_worker_commits_only_after_processing` | (a) | commit happens **after** successful processing, never on receipt | ✅ |
 | `tests/test_main.py::test_worker_finishes_the_in_flight_batch_after_stop` | (a) | SIGTERM closes intake but does not abandon received work | ✅ |
-| `auto-tests/group-a/validate-deploy.sh` | (a) | the built image boots read-only as uid 10001, serves `/health`, and exits 0 on SIGTERM | ✅ |
+| `auto-tests/group-a/validate-deploy.sh` | (a) | the built image boots read-only as uid 10001, serves `/health` and `/metrics`, and exits 0 on SIGTERM | ✅ |
 | Chart renders and packages (`/helm-package.yml`) | (a) | the chart is valid at the released SemVer | ✅ |
 
 <!-- Template — copy per new feature:
