@@ -32,10 +32,10 @@ build: ## Build the wheel/sdist
 	$(PY) -m build
 
 image: ## Build the Docker image locally
-	DOCKER_BUILDKIT=1 docker build -t app:local .
+	DOCKER_BUILDKIT=1 docker build -f deploy/Dockerfile -t app:local .
 
 chart: ## Lint + template the Helm chart
-	helm lint chart && helm template t chart >/dev/null
+	helm lint helm && helm template t helm >/dev/null
 
 version: ## Print the GitVersion SemVer (via Docker, no local install)
 	@docker run --rm -v "$(CURDIR):/repo" $(GITVERSION_IMAGE) /repo /showvariable SemVer

@@ -27,10 +27,11 @@ include:
       - /functional.yml         # runs this repo's auto-tests/group-a/*.sh
 
 variables:
-  # Layout: Dockerfile at the repo root and chart under chart/
-  # (template defaults are deploy/Dockerfile and helm/).
-  DOCKERFILE: "Dockerfile"
-  CHART_PATH: "chart"
+  # No DOCKERFILE or CHART_PATH override, deliberately. This repo now uses the canonical
+  # layout its own service profile declares — deploy/Dockerfile and helm/ — which is exactly
+  # what globals.yml already defaults to, so the two overrides that used to sit here became
+  # noise restating a default. Every override is a line a reader has to check against upstream
+  # before trusting it; the best CI file is the one with nothing in it.
 
   # The Python package lives in src/ — point the linters, complexity gate and bandit at it.
   PYTHON_LINT_PATHS: "src"

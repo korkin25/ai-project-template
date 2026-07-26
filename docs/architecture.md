@@ -31,7 +31,7 @@ names no registry: the image and the chart go to whichever registry the chosen C
 provides, and to the *same* one — a second registry is a second set of credentials, a second
 retention policy and a second thing to be out of sync. Which host and therefore which registry
 is a project decision recorded here, not something the standard decides. Runtime configuration
-is in [configuration.md](configuration.md); the chart's own knobs are in `chart/README.md`.
+is in [configuration.md](configuration.md); the chart's own knobs are in `helm/README.md`.
 
 **CI host — not yet settled for this repo.** The standard requires exactly one host, chosen
 once and recorded in this section. This repo currently carries *both* `.gitlab-ci.yml` and
@@ -41,17 +41,22 @@ investigates and trains everyone to ignore a red check. Resolving it is `PRJ-14`
 standard host-agnostic) and `PRJ-17` (mirror to GitLab and prove parity); until one of them
 lands, treat neither pipeline as authoritative.
 
-### Layout deviation from the `service` profile
+### Layout — canonical, and deliberately so
 
-The profile declares `deploy/Dockerfile` and `helm/` canonical, because those are the shared
-CI templates' defaults — a repo that uses them needs no `DOCKERFILE`/`CHART_PATH` override.
-**This repo deviates: the image is built from the root `Dockerfile` and the chart lives in
-`chart/`.** The reason is history, not design — the layout predates the profile, and this repo
-is also the one every other repo is spawned from, so moving it is a change to the scaffolds
-and the CI overrides in the same breath rather than a rename. The profile permits the
-deviation only when it is written down, which is what this paragraph is; the cost is that this
-repo must keep the two overrides its CI sets, and that a reader comparing it to
-`templates/service/` sees two different layouts. Migrating to the canonical one is `PRJ-5`.
+`deploy/Dockerfile` and `helm/`, which is what the `service` profile declares and what the
+shared CI templates already default to. The repo previously used a root `Dockerfile` and
+`chart/`, inherited from before the profile existed, and carried two `DOCKERFILE`/`CHART_PATH`
+overrides to compensate.
+
+Both overrides are now gone, and that is the concrete argument for having migrated rather than
+documenting the deviation: **the canonical layout costs nothing and the deviation cost two
+lines of configuration that only restated a default.** Every override is a line a reader must
+check against upstream before trusting it.
+
+The other reason is precedent. This repository is the first consumer of every rule it
+publishes, and the rule that a deviation must be written down exists for repos with a real
+constraint — not as a way for the standard's own repo to exempt itself from its own canon
+while telling eleven others to follow it.
 
 ## Decisions log
 
@@ -99,8 +104,12 @@ is a supply-chain hole in the standard's own tooling.
 - The standard is **vendored, not referenced**. There is no version pin for a consumer to bump
   and nothing announces a new version, so a stale copy is silent until someone regenerates.
   The drift gate is the only thing that catches it, which makes that gate load-bearing rather
-  than cosmetic — and it is **not yet wired into any CI** (`PRJ-2`). Until it is, this decision
-  buys single-sourcing without the enforcement it assumes.
+  than cosmetic. It is now wired on both hosts and in the `service`, `library`, `infra` and
+  `platform` scaffolds (`PRJ-2`), so a repo created from here inherits the enforcement rather
+  than the promise of it. Note what the gate can and cannot see: it proves a repo's committed
+  `CLAUDE.md` matches *its own* vendored sources — it cannot tell that those sources are a
+  version behind upstream. Catching that is the `sync-standard` skill's job, and it does not
+  exist yet.
 - Propagation is part of a rule change, not a follow-up. Between the upstream edit and the last
   repo's regeneration the group is running two standards and neither is authoritative.
 - The generated header carries a `Sources-SHA256` over the *sources*, not the rendered output,

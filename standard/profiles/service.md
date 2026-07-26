@@ -100,7 +100,14 @@ depend on them:
   dedicated uid/gid; the chart sets `runAsNonRoot`, `readOnlyRootFilesystem`,
   `allowPrivilegeEscalation: false`, drops all capabilities, and mounts an `emptyDir` at
   `/tmp` for anything that must write.
-- **Logs go to stdout**, structured, with no secrets in them.
+- **Exposes `GET /metrics`** in Prometheus text format, and the chart ships a `ServiceMonitor`
+  (or the equivalent scrape config) that is enabled wherever a metrics backend exists. A chart
+  that templates a `ServiceMonitor` against an endpoint the service does not serve is a
+  scrape target that fails silently — the panels stay empty and nobody is told why.
+- **Logs go to stdout**, one JSON object per line, using the shared library's schema so field
+  names are identical across services. No secrets, no personal data. Every value that anyone
+  would filter by is its own field, never interpolated into the message text — see
+  *Observability*.
 - **Shutdown is graceful**: SIGTERM stops intake, finishes in-flight work, commits offsets,
   exits non-zero only on real failure.
 - **Message handling is idempotent and commits after success**, never before. Auto-commit on

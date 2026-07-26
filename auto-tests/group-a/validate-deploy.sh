@@ -15,7 +15,7 @@ fi
 PORT="${APP_PORT:-8080}"
 
 echo "== docker build =="
-DOCKER_BUILDKIT=1 docker build -t app:ci-test .
+DOCKER_BUILDKIT=1 docker build -f deploy/Dockerfile -t app:ci-test .
 
 echo "== boot service and probe /health on :${PORT} =="
 docker rm -f app-ci >/dev/null 2>&1 || true

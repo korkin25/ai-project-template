@@ -14,8 +14,8 @@ The gates are live and proven: `standard-drift` runs green on GitHub in ~10s, an
 was verified by extracting its script and running it against stubbed diffs on every profile.
 Both now ship in the `service`, `library` and `infra` scaffolds too.
 
-**Next action: PRJ-5** — decide the layout question, because it is the one place this repo
-still contradicts a rule it publishes, and `PRJ-15` (the Helm review) depends on the answer.
+**Next action: PRJ-15** — review the Helm section of the `service` profile now that the
+layout question is settled and the chart lives where the profile says it does.
 
 ## Legend
 
@@ -42,7 +42,6 @@ the consuming group (for `job-agent` that is `JAP-<n>`), cited in the row.
 | id | | Task | Details |
 |---|---|---|---|
 | PRJ-1 | 🟡 | **Multi-repo standard: generated `CLAUDE.md`, four profiles, scaffolds** | `standard/{base.md,profiles/*,compose.sh,repo.env}` + `templates/{service,library,platform,infra}/`. Adds the cross-repo dimension: contract ownership, the service↔platform interface, test tier (d), cross-repo blast radius, mandatory `AUTOPILOT-LOG.md`, Liquibase-always, the monthly version audit, *Capture first*, *Changing the rules*. Field-tested by `job-agent`. |
-| PRJ-5 | ⬜ | **This repo violates its own `service` profile** | Layout is `Dockerfile` + `chart/`; the profile declares `deploy/Dockerfile` + `helm/` canonical and requires a deviation note in `docs/architecture.md`. Either migrate the layout or write the note — silence is the one option the profile excludes. |
 | PRJ-7 | ⬜ | **GitLab parity** — `JAP-11` | `CODEOWNERS` in GitLab syntax + approval rules; `renovate.json` replacing Dependabot; `.gitlab/merge_request_templates/default.md`; a GitLab publish job; documented `glab` commands for protecting `dev`/`rc`/`release`. |
 | PRJ-10 | 🟡 | **No coverage threshold** | `pytest-cov` is installed and never configured — no `--cov-fail-under`, no `[tool.coverage]`. Each repo will drift on the quality bar the standard claims to set. |
 | PRJ-15 | ⬜ | **Helm chart standardization is a first-class part of the standard** | Listed by the user among the standard's required subjects. Today it is a section of the `service` profile; verify it actually covers what a fleet needs — probes, security context, resources, `envFrom` conventions, `ServiceMonitor`, routing via Gateway API, secret references, and the CI-written version/tag fields — and that nothing in it is project-specific. |

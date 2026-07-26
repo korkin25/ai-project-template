@@ -275,7 +275,7 @@ placeholder ends up pinned in production:
 | Not a contract | Why it exists |
 |---|---|
 | `src/app/` — the `/health` endpoint, the `app` / `app-serve` commands | a sample service that keeps this repo's own CI green and demonstrates the shape; replaced on adoption |
-| `chart/` values — `ghcr.io/OWNER/REPO`, `tag: ""` | template placeholders; `OWNER/REPO` is not a registry path |
+| `helm/` values — `ghcr.io/OWNER/REPO`, `tag: ""` | template placeholders; `OWNER/REPO` is not a registry path |
 | `docker-compose.yml` — `image: ghcr.io/OWNER/REPO:latest` | local-run convenience. A version auditor reading this repo flags it as `UNPINNED`; that finding is about a placeholder, not about a deployed image |
 | `.claude-plugin` plugin version | absent on purpose; resolution falls back to the commit SHA. Not an interface, and re-adding it would freeze every install |
 

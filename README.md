@@ -19,7 +19,7 @@ or any Agent-Skills runtime) knows exactly how to work in the repo from `CLAUDE.
 | **CI (GitHub)** | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — **composition-only**: every job comes from the public reusable workflows in [`korkin25/open-ci-actions@v1`](https://github.com/korkin25/open-ci-actions) (detect → python / sast / docker → GHCR / helm / functional / release). The file is wiring + inputs; new shared jobs belong in open-ci-actions |
 | **CI (GitLab mirror)** | [`.gitlab-ci.yml`](.gitlab-ci.yml) — **include-only**: every job comes from the shared `open_ci_cd/templates` (python gates, image → Container Registry, chart → Package Registry, functional, and SAST: checkov/trivy/gitleaks/semgrep/bandit/pip-audit/hadolint). The file holds nothing but `include:` + variable overrides |
 | **Container** | [`Dockerfile`](Dockerfile) (multi-stage, non-root), [`docker-compose.yml`](docker-compose.yml) |
-| **Deploy** | [`chart/`](chart/) — generic Helm chart (Deployment + Service, plus opt-in PVC, Gateway API HTTPRoute, ServiceMonitor, HPA and PDB), published as an OCI chart at the same version as the image |
+| **Deploy** | [`helm/`](helm/) — generic Helm chart (Deployment + Service, plus opt-in PVC, Gateway API HTTPRoute, ServiceMonitor, HPA and PDB), published as an OCI chart at the same version as the image |
 | **Skills** | [`skills/`](skills/) — portable `SKILL.md` template + authoring guide; [`.claude-plugin/`](.claude-plugin/) — marketplace/plugin manifests. Neither manifest declares a `version`: Claude Code falls back to the source's git commit SHA, which keeps the never-hardcode-a-version rule intact — do not add one back |
 | **Multi-agent pickup** | `CLAUDE.md` is the one rulebook; `AGENTS.md`, `GEMINI.md`, `.cursorrules`, `.clinerules`, `.windsurfrules`, `.github/copilot-instructions.md` symlink to it, `.cursor/rules/*.mdc` points to it — Codex/Cursor/Copilot/Gemini/Cline/Windsurf all load the same rules |
 | **Stay-in-context** | a `CLAUDE.md` router ("context map"), a per-turn reminder hook (`.claude/settings.json`), and a CI `doc-sync` guard so agents don't forget the docs/tests/skills |
@@ -38,7 +38,7 @@ it with your real code.
    `TODO.md`.
 3. **Language.** `CLAUDE.md` sets repo content = English, live chat = your working language
    (default here: Russian). Change the chat language if needed.
-4. **Trim what you don't use.** No k8s? Drop `chart/`. No container? Drop `Dockerfile`,
+4. **Trim what you don't use.** No k8s? Drop `helm/`. No container? Drop `deploy/Dockerfile`,
    `docker-compose.yml` and the image/chart CI jobs. Everything optional in the chart
    (`persistence`, `gatewayApi`, `serviceMonitor`, `autoscaling`, `podDisruptionBudget`) is
    already off by default — enable what you need rather than deleting what you don't.
