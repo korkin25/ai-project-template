@@ -127,6 +127,40 @@ dataServices:
     reason: Keeps derived stores in sync without the writing service knowing they exist.
     required: false
 
+# Observability backends. The rulebook's *Observability* section states that a metrics backend
+# and a log backend are hard requirements; until these entries existed it said so and declared
+# neither, which is the standard failing its own "declare capabilities, never implementations"
+# rule in the one file that exists to hold them.
+#
+# Expect `check-requirements.py` to FAIL against a cluster that has no monitoring stack. That
+# is the intended behaviour and the reason the contract exists — the same choice already made
+# for `gateway`. A named, failing requirement is a decision waiting to be made; a requirement
+# left undeclared is a `CrashLoopBackOff` an hour into a deployment.
+observability:
+  - name: metrics-backend
+    capability: Prometheus-compatible store that scrapes ServiceMonitors, with query API
+    reason: >-
+      Every service chart renders a ServiceMonitor. Without somewhere to scrape into, the
+      metrics a feature is required to ship are emitted and discarded.
+    required: true
+
+  - name: log-backend
+    capability: Log store accepting structured JSON with queryable fields, not full-text only
+    reason: >-
+      The logging schema puts every value in its own field precisely so it can be queried.
+      A store that only does substring search over the message turns that back into regex.
+    required: true
+
+  - name: trace-backend
+    capability: OTLP-compatible trace store, correlatable with logs by trace id
+    reason: >-
+      OPTIONAL BY DESIGN — see *Distributed tracing* in the rulebook. Declare this only when
+      a backend is actually deployed; a service exporting spans into a cluster with nowhere to
+      store them is doing arithmetic in private. Tempo is the usual pairing where Grafana is
+      already the dashboard, because it shares the label vocabulary — but the capability is
+      stated in terms of OTLP, never a product, so any compliant store satisfies it.
+    required: false
+
 # Model access. Exactly one of these must be satisfiable; the platform prefers the in-cluster
 # option when it is present and falls back to a hosted API otherwise.
 modelAccess:

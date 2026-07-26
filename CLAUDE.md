@@ -1,7 +1,7 @@
 <!-- GENERATED FILE — DO NOT EDIT.
      Sources : standard/base.md + standard/profiles/service.md + standard/repo.env
      Profile : service
-     Sources-SHA256: 76b8ee9cb18850dbd2a7ce928adc6f87b5dce2327cb9c283fd563699b5d8fbdb
+     Sources-SHA256: 3931f33cc47fbe7ca4829d29d4fda5b70d789a49bab0b71853e2d5fd20088834
      Regenerate: ./standard/compose.sh
      Edit the sources, never this file. CI fails a change where the two disagree.
 -->
@@ -419,6 +419,34 @@ the metric is the moment you cannot add it — production is misbehaving and you
 | **Fields as structured metadata** | Every field is a queryable label on the log entry, **never** packed into the message string. A value you have to extract with a regex at query time is not queryable — it is a hope. This is what makes a log store searchable rather than merely full. |
 | **The dashboard, in the same change** | A metric with no panel is a metric nobody looks at. Prefer generating panels from the metric definitions over drawing them by hand: a hand-drawn dashboard is the first artefact to rot, because nothing fails when it goes stale. Dashboards that span services live in the platform repo, versioned with the environment. |
 | **`docs/observability.md`** | For each metric: what it means, what value is bad, and what to do about it. A metric whose healthy range nobody wrote down cannot be alerted on — the alert threshold becomes a guess, and a guessed threshold is either ignored or paged on nightly. |
+
+### Distributed tracing — optional, and "optional" is load-bearing
+
+Metrics say *something is slow*. Logs say *what this one process did*. Neither answers the
+question that costs the most time in a multi-repo platform: **which of the six services made
+this request slow, and what was it waiting on.** That is a trace, and nothing else produces it.
+
+**A project opts in. The standard does not mandate tracing**, for the same reason it mandates
+a metrics backend: a service exporting spans into a cluster with nowhere to store them is
+doing arithmetic in private. The rule below binds a repo **only once its platform declares a
+trace backend** in `requirements.yaml`. Where none is declared, emitting spans is not
+non-compliance and adding them is not an improvement.
+
+Stated plainly so "optional" cannot quietly become "never": once a backend exists, tracing
+stops being optional for the request paths that cross a service boundary. The opt-in is a
+platform decision, not a per-feature one.
+
+| | |
+|---|---|
+| **Emission is vendor-neutral** | OpenTelemetry, exported over **OTLP**. The instrumentation lives in the shared library exactly as the log schema does, so no service invents its own span names or its own propagation. A service must never import a backend's SDK — that is how a backend choice becomes twelve repositories' problem. |
+| **The backend is a project decision** | Recorded in the project's `docs/architecture.md`, never here. **Tempo** is the usual choice where Grafana is already the dashboard, because it shares the label vocabulary; it is not the standard's choice to make. |
+| **Context propagates across every boundary** | W3C `traceparent` on HTTP, and in message headers on the bus. A trace that stops at the first queue is the half that was already easy to reason about. |
+| **The trace id is a log field** | This is the payoff, and it is the part most often skipped. A slow request in a dashboard must lead to its spans and to its log lines without anyone copying an identifier by hand. It belongs in the shared logging schema alongside every other structured field — see *Fields as structured metadata*. |
+| **Sample deliberately, and write the rate down** | Head sampling is cheap and loses the rare slow request, which is the one worth having; tail sampling keeps it and costs more. Either is defensible; an unstated rate is not, because nobody can tell a missing trace from a dropped one. |
+
+Spans obey the same limits as everything else here: **no secrets and no personal data in
+span names or attributes**, and an attribute with unbounded values is the cardinality problem
+again, one layer down.
 
 ### Rules that follow
 

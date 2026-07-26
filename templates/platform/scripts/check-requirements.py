@@ -233,6 +233,19 @@ def check(reqs: dict[str, Any], cluster: Cluster, report: Report) -> None:
     for svc in reqs.get("dataServices") or []:
         report.add("data services", svc["name"], UNVERIFIED, bool(svc.get("required")), svc.get("capability", ""))
 
+    # Observability backends. Reported UNVERIFIED, like dataServices, and for the same reason:
+    # "a Prometheus-compatible store" and "an OTLP-compatible trace store" are capabilities, not
+    # objects, and there is no implementation-neutral way to probe them from kubectl. A check
+    # that guessed — looking for a Deployment named `prometheus`, say — would pass on the wrong
+    # thing and fail on VictoriaMetrics, which is worse than admitting it cannot tell.
+    #
+    # This loop exists so the group is READ. Before it, the observability entries in
+    # requirements.yaml were parsed by nobody: the file declared them, the checker iterated a
+    # fixed list of other keys, and the result was a requirement that could never be reported
+    # missing. A declaration nothing reads is indistinguishable from one nobody wrote.
+    for obs in reqs.get("observability") or []:
+        report.add("observability", obs["name"], UNVERIFIED, bool(obs.get("required")), obs.get("capability", ""))
+
     for model in reqs.get("modelAccess") or []:
         node_reqs = (model.get("nodeRequirements") or {}).get("resources") or []
         if not node_reqs:
