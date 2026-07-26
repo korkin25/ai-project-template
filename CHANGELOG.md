@@ -7,6 +7,36 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **The standard is generated, not hand-maintained.** `standard/base.md` holds what binds
+  every repository; `standard/profiles/{service,library,platform,infra}.md` hold what binds
+  one kind; `standard/compose.sh` composes them with `standard/repo.env` into `CLAUDE.md`,
+  stamping a checksum of the sources. `--check` regenerates and diffs, so a hand-edited
+  `CLAUDE.md` is a detectable error rather than a silent divergence. The agent rule files
+  (`AGENTS.md`, `GEMINI.md`, `.cursorrules`, …) remain symlinks to the generated file.
+- **A multi-repo dimension**, because one standard now governs a group rather than a project:
+  per-repo ticket prefixes with a platform id for cross-repo work; a contract registry
+  (`docs/contracts.md`) and the protocol for changing a contract someone else consumes; the
+  service↔platform interface reduced to one thing, the published version in `.versions/*.env`;
+  a fourth test tier (d) for cross-service end-to-end, living in the platform repo; cross-repo
+  blast-radius rules; and a mandatory `AUTOPILOT-LOG.md` with a fixed entry format.
+- **Scaffolds for all four profiles** under `templates/`, including the platform profile's
+  `bundle.schema.json`, a worked environment bundle, `validate-bundles.py`, `render.py` and
+  `check-requirements.py` — the last of which verifies a live cluster against a declared
+  `requirements.yaml` written in terms of capabilities rather than implementations.
+- **Database schema changes are Liquibase changesets, always** — because a schema shared by
+  several services is a cross-repo contract with no compiler to catch a rename.
+- **A monthly version audit, as two skills** — `cluster-version-audit` for the substrate and
+  `data-plane-version-audit` for anything holding state. Split deliberately: for the substrate
+  a rollback is a chart version, while for stateful components the upgrade is frequently
+  one-way and the backup comes first. Both report everything they find and apply nothing.
+- **`Capture first`** — every request from the user is written into `TODO.md` immediately, in
+  the turn it is asked, before answering or designing.
+- **`Changing the rules — the standard is upstream`** — a new rule goes into `standard/` first
+  and propagates down, never into a generated `CLAUDE.md`; propagation is part of the change;
+  and this repository is the first consumer of every rule it publishes.
+
 ### Changed
 
 - **Removed `Features.md` — features live in `README.md` `## Features`.** The user-facing
