@@ -1,7 +1,7 @@
 <!-- GENERATED FILE — DO NOT EDIT.
      Sources : standard/base.md + standard/profiles/service.md + standard/repo.env
      Profile : service
-     Sources-SHA256: 3931f33cc47fbe7ca4829d29d4fda5b70d789a49bab0b71853e2d5fd20088834
+     Sources-SHA256: 25a5794aa99a764a356d1d05ece293fd1153b29f19a328196e1faa6a1b80787d
      Regenerate: ./standard/compose.sh
      Edit the sources, never this file. CI fails a change where the two disagree.
 -->
@@ -462,6 +462,49 @@ again, one layer down.
 
 The retrofit is real work: a service that has been running without any of this needs it added,
 and that is a ticket like any other. What it is not is optional.
+
+## Workload hardening — every deployment, no exceptions
+
+Every container this group deploys — in a chart, in a raw manifest, in a Job, in a sidecar —
+carries all five of the following. Not "should": **the gates below reject the ones that do
+not**, because a hardening rule that depends on the author remembering is satisfied by exactly
+the deployments whose authors were already careful.
+
+| | What it means, and what it prevents |
+|---|---|
+| **`resources.requests` on CPU and memory** | The scheduler places pods by *requests*, so a container without them is invisible to it: the node looks free while it is not, and the next workload is placed onto a machine that cannot hold it. On a single-node cluster this is the difference between "the LLM pod is pending" and "everything on the node is evicted". |
+| **`resources.limits` on memory** | A container without a memory limit is bounded only by the node. One leak takes the whole machine down instead of one pod, and the kubelet then evicts by QoS class — killing whatever was cheapest, not whatever was wrong. **A CPU limit is deliberately NOT required**: CPU is compressible, and a limit throttles a container that has nothing to steal from. Requiring one is a common and expensive cargo-cult. |
+| **`readOnlyRootFilesystem: true`** | Turns "an attacker got execution" into "an attacker got execution and cannot persist". A process that needs to write gets an explicit `emptyDir` at the path it needs, which also documents what it writes — usually a surprise to everyone including its author. |
+| **`capabilities: drop: [ALL]`, `allowPrivilegeEscalation: false`** | Default Linux capabilities include things nothing here needs. Drop everything and add back the specific capability with the reason in a comment — `NET_BIND_SERVICE` for a port below 1024 is the only common one, and even that is better solved by not using such a port. |
+| **`runAsNonRoot: true` with a high UID** | Root in a container is root on the host the moment anything else fails. **Use a UID above 10000**: a low one collides with a real account on the node, and on a shared or hostPath volume that collision *is* access to another identity's files. Set `fsGroup` to the same value or a PVC-backed container cannot write to its own volume. Verify the image actually starts as that UID rather than assuming — images that look their user up in `/etc/passwd` fail, and finding that out in a cluster costs far more than one `docker run --user`. |
+
+### How this is enforced, in three layers that catch different things
+
+One gate is not enough, and the reason is worth stating: each layer sees something the others
+cannot.
+
+1. **checkov in CI, before merge.** Catches it in the diff, where fixing it is free. This is
+   the layer that must never be weakened by a convenient skip — see below.
+2. **A policy engine at admission.** Catches what CI never sees: a chart from a third party, a
+   `kubectl apply` by hand, an operator generating pods from a CR. CI reads the repo; admission
+   reads reality.
+3. **Pod Security Admission `restricted` on the namespace.** A cheap backstop that needs no
+   controller and no policy to maintain. It covers non-root and capabilities but **not**
+   requests and limits, which is precisely why it is the third layer rather than the only one.
+
+### A skip is a decision, and it expires
+
+Every waiver in `.checkov.yaml` carries the reason **that is true of this repository**, not one
+copied from another. The failure mode is specific and has already happened here: an upstream
+skip list waived "image not digest-pinned" with the reason *CI writes the real tag at package
+time* — true for a chart built by a pipeline, and simply false in a repo where nothing rewrites
+manifests. A copied reason is worse than no reason, because it reads as though somebody thought
+about it.
+
+Two rules follow. **Prefer satisfying the check to waiving it** — the two above were fixed
+rather than skipped, and the passing count went *up*, which is the outcome to aim for. And
+**when the thing a waiver describes disappears, the waiver goes with it**: a skip whose subject
+no longer exists is how a skip list rots into a list nobody dares touch.
 
 ## Versioning & releasing (auto-generated — never hardcode)
 
