@@ -456,6 +456,44 @@ again, one layer down.
 The retrofit is real work: a service that has been running without any of this needs it added,
 and that is a ticket like any other. What it is not is optional.
 
+## Human authentication is delegated, never implemented
+
+**No service in this group implements a login.** Not a username/password form, not a session
+table, not a password reset flow, not "just a shared secret for now". Human access is delegated
+to a single identity provider over **OIDC** — either through the application's native OIDC
+support, or through an authenticating proxy in front of applications that have none.
+
+The protocol is the standard's business; **which provider is a project decision**, recorded in
+the project's `docs/architecture.md` and never here.
+
+The reason is not that login code is hard to write. It is that login code is hard to *retire*.
+Every service that grows its own accumulates a private list of who has access, and the day
+somebody leaves you have N places to revoke and no way to prove you found them all. Delegating
+gives one place to revoke, one audit trail, MFA configured once instead of N times, and group
+membership that maps to roles in one file rather than N databases.
+
+### The failure this pattern introduces, and it must be answered up front
+
+Centralised identity makes the provider a **single point of failure for every service at
+once**. When it is down, nobody can log in anywhere — including into the tools you would use to
+diagnose why it is down.
+
+So a project adopting this owes two things before the first service depends on it:
+
+- **A break-glass path**, written in `docs/runbook.md`: how to reach at least the observability
+  stack when the provider is unavailable. A local admin account whose credentials live in the
+  secret store is the usual answer. It is not a compromise of the pattern; it is the part that
+  makes the pattern survivable.
+- **An honest ordering.** A service configured for OIDC against a provider that is not deployed
+  yet does not degrade — it fails closed, and it looks exactly like a broken service. This has
+  already happened in this group: a `Grafana` CR mounting an OIDC secret and taking its admin
+  credentials from the provider was written and staged while the provider itself was never
+  wired into the cluster. Deploy the provider first, or give the service a working local path
+  until it exists — and say which of the two you chose, in the same change.
+
+This is about **human** access. Service-to-service authentication is a different problem with
+different mechanisms, covered separately; do not solve one by reaching for the other.
+
 ## Workload hardening — every deployment, no exceptions
 
 Every container this group deploys — in a chart, in a raw manifest, in a Job, in a sidecar —
