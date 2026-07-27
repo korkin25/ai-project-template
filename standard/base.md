@@ -795,6 +795,31 @@ with the repository.
 **Report a commit only after pushing.** A link to a commit that exists locally is a 404, and
 it stays a 404 silently — the message still looks correct.
 
+### The feed is written in the team's working language, not the repository's
+
+**A status feed is not repository content.** The *Language rules* above put every file in
+English and every conversation in the team's working language; a chat channel is the second
+kind, and until this paragraph existed it was ambiguous enough that a project could get it
+wrong in either direction.
+
+The reasoning is the same one that makes the feed one line long: it is read by people, on a
+phone, months later, and it competes for attention with everything else in that app. A message
+in a language its readers translate in their heads is a message they skim past, which defeats
+the only purpose it has.
+
+**Two things stay in their original form regardless**, because they are identifiers rather than
+prose:
+
+- **The exact name of a rule, feature or skill in a 📐 message** — spelled as it appears in the
+  source, which means English. That name is the search key; translating it makes the message
+  unfindable by anyone grepping for the thing itself.
+- **The commit subject in a 🔗 message.** It is quoted from the commit, and a commit message is
+  repository content.
+
+So a typical 📐 line is prose in the working language wrapped around an English name and an
+English filename. That looks inconsistent and is not: the prose is for the reader, the name is
+for the search.
+
 ### The channel is write-only
 
 This is a security boundary, not a convenience.
