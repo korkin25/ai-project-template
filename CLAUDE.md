@@ -1,7 +1,7 @@
 <!-- GENERATED FILE — DO NOT EDIT.
      Sources : standard/base.md + standard/profiles/service.md + standard/repo.env
      Profile : service
-     Sources-SHA256: dc6a764a833961607b110aaedc4d08baf6da76c87e853084d4c7cbb04df6737d
+     Sources-SHA256: f0be5776440bbd363f8c375f31ff4bd28fb958db262e72dd258906405d6bcfd8
      Regenerate: ./standard/compose.sh
      Edit the sources, never this file. CI fails a change where the two disagree.
 -->
@@ -491,6 +491,61 @@ written rather than at the moment it is upgraded.
 
 Which MCP servers a project runs, and where they live, is a project decision recorded in its
 own docs — never here.
+
+## An MCP server may read a cluster. It may not change one.
+
+Agents get MCP servers that talk to Kubernetes, and those servers ship write tools —
+`apply_kubernetes_manifest`, `delete_kubernetes_resource`, patch, scale. **Those tools are not
+used here.** Every change to a cluster's desired state goes through git and the reconciler,
+without exception and regardless of how convenient the tool makes it.
+
+This is not caution about agents. It is what GitOps *means*: the repository is the desired
+state, so a change applied beside it has exactly two futures, and both are bad. Either the next
+reconcile reverts it — and the work is lost along with the twenty minutes spent proving it
+worked — or the reconciler does not own that object and the change **survives, undocumented,
+in no diff and no review**, until someone rebuilds the cluster from git and it silently
+disappears. The second outcome is worse, and it is the more common one.
+
+The same reasoning already governs infra CI: a pipeline that can apply must hold cluster-admin,
+which is a larger standing risk than the manual step it saves. An agent session holding the
+same power is the same trade with a shorter memory.
+
+### The exception: suspending and resuming reconciliation
+
+`suspend` and `resume` **are** permitted, and they earn it by being a different kind of verb.
+
+They change *whether the reconciler is acting*, not *what it is converging to* — the desired
+state in git is untouched, so nothing diverges and nothing is lost. They are exactly reversible
+by their counterpart. And they are needed at the one moment a git round-trip is unaffordable: a
+reconcile loop is fighting a manual investigation, or a bad release is being re-applied every
+minute while you are trying to read why.
+
+Two conditions on the exception, so it stays one:
+
+- **A suspend that is not resumed is an outage in slow motion.** Reconciliation silently stops
+  matching git, and the cluster drifts from the repository with nothing reporting it. Whoever
+  suspends says so in `AUTOPILOT-LOG.md` — including that it is still suspended — and resumes
+  it in the same session or hands it over explicitly.
+- **Never suspend to make a change stick.** Suspending in order to hand-apply something is the
+  banned operation wearing the permitted one's clothes.
+
+### This presumes the cluster is reachable at all
+
+The whole arrangement assumes the assistant runs somewhere with network access to the cluster's
+API. **In a separated contour — a different security zone, an air-gapped or jump-host-only
+environment — an MCP server simply cannot reach it**, and no rule is needed because no tool
+works. What matters is not pretending otherwise: an operational procedure that only exists
+through an assistant's MCP session is a procedure that does not exist for the environments that
+matter most. Anything that must be doable in production belongs in `docs/runbook.md` as
+commands a human can run.
+
+### Make it mechanical
+
+A rule that depends on an agent choosing not to call a tool it can see is not a rule. Where the
+server supports it, run it against a **read-only identity** — impersonating a ServiceAccount
+bound to a read-only role, or a kubeconfig context with no write verbs — so the write tools
+fail at the API server rather than at the agent's discretion. Where a server offers no such
+switch, that is a finding to record, not a reason to relax the rule.
 
 ## Credentials the platform owns are generated, never typed
 
