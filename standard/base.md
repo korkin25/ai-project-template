@@ -485,6 +485,67 @@ written rather than at the moment it is upgraded.
 Which MCP servers a project runs, and where they live, is a project decision recorded in its
 own docs — never here.
 
+## Credentials the platform owns are generated, never typed
+
+**From the first commit of a project, not once it settles.** Any credential the platform
+itself defines — a database password, an admin password, a service-to-service shared secret —
+is **generated inside the cluster, pushed into the secret store, and read back out** by the
+workload that needs it. Nobody chooses it, nobody types it, nobody knows it.
+
+The chain, in External Secrets Operator terms and stated generically because the operator is a
+project choice:
+
+| Step | What it does |
+|---|---|
+| a **generator** (`kind: Password`) | mints a random value in-cluster |
+| a **push** (`kind: PushSecret`) | writes that value *into* the secret store |
+| an **`ExternalSecret`** | reads it back out into whichever namespace needs it |
+
+The store stays the source of record — so the value outlives the namespace, and anything else
+that needs it reads the same copy — while the value itself never exists outside the cluster and
+the store.
+
+### What this removes, which is the whole argument
+
+- **No human ever holds it.** It is not in a shell history, a password manager, a ticket, a
+  chat message, or a colleague's memory. Rotation stops being a project and becomes deleting
+  the pushed secret.
+- **No bootstrap chicken-and-egg.** The classic alternative is generating passwords in
+  **Terraform at cluster-bootstrap time** — and that puts every one of them in **Terraform
+  state**, which is then itself a secret-bearing artefact needing encryption, access control
+  and a backup story of its own. You have not protected a credential; you have moved it into a
+  file that is harder to rotate and easier to copy. This pattern deletes that whole problem
+  rather than managing it.
+- **No seeding step in a runbook.** A workload that cannot start until somebody runs
+  `vault kv put` is a workload that cannot be brought up by automation, cannot be rebuilt from
+  zero without a human, and whose runbook rots the day that human is unavailable.
+
+### Where it does NOT apply, stated so the rule stays usable
+
+**A credential issued by a third party cannot be generated.** A GitLab or GitHub token, a
+cloud provider key, an SMTP password from a mail vendor — those are minted elsewhere and must
+be seeded into the store by a human, once. That is legitimate and the rule does not pretend
+otherwise; what the rule forbids is a *self-chosen* secret being typed when the platform could
+have generated it.
+
+The test: **could the platform have invented this value?** If yes, it generates it. If it had
+to be obtained from someone else, it is seeded, and the seeding step is documented in
+`docs/runbook.md` with where the value comes from.
+
+### Three things to get right, each of which has already bitten
+
+- **A store advertising write capability is not a store that permits writes.** In this group a
+  `ClusterSecretStore` reported `ReadWrite` while the underlying policy granted `read` only —
+  the push would have failed with `permission denied` at the worst moment. Check the policy,
+  not the CR.
+- **Grant the write narrowly.** Write access to every path the platform stores is a far larger
+  grant than read access to them. Prefer a distinct prefix that is writable while the rest
+  stays read-only.
+- **State the rotation semantics in the manifest.** Whether re-reconciling regenerates and
+  overwrites the stored value decides whether this is a convenience or a way to silently
+  invalidate a running system's credential. Write down which it is; do not leave it to be
+  discovered.
+
 ## Human authentication is delegated, never implemented
 
 **No service in this group implements a login.** Not a username/password form, not a session
