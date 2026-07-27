@@ -1,7 +1,7 @@
 <!-- GENERATED FILE — DO NOT EDIT.
      Sources : standard/base.md + standard/profiles/service.md + standard/repo.env
      Profile : service
-     Sources-SHA256: af082042f8e9bb1edc1bec55350d66843afbecf9f14ac43353655c58d390a8fa
+     Sources-SHA256: 7ca332f4a5591ee2ff625ea675074f81a6551df6060c2ee1fffeeaeb9a4e6756
      Regenerate: ./standard/compose.sh
      Edit the sources, never this file. CI fails a change where the two disagree.
 -->
@@ -543,7 +543,14 @@ the deployments whose authors were already careful.
 | **`resources.limits` on memory** | A container without a memory limit is bounded only by the node. One leak takes the whole machine down instead of one pod, and the kubelet then evicts by QoS class — killing whatever was cheapest, not whatever was wrong. **A CPU limit is deliberately NOT required**: CPU is compressible, and a limit throttles a container that has nothing to steal from. Requiring one is a common and expensive cargo-cult. |
 | **`readOnlyRootFilesystem: true`** | Turns "an attacker got execution" into "an attacker got execution and cannot persist". A process that needs to write gets an explicit `emptyDir` at the path it needs, which also documents what it writes — usually a surprise to everyone including its author. |
 | **`capabilities: drop: [ALL]`, `allowPrivilegeEscalation: false`** | Default Linux capabilities include things nothing here needs. Drop everything and add back the specific capability with the reason in a comment — `NET_BIND_SERVICE` for a port below 1024 is the only common one, and even that is better solved by not using such a port. |
-| **`runAsNonRoot: true` with a high UID** | Root in a container is root on the host the moment anything else fails. **Use a UID above 10000**: a low one collides with a real account on the node, and on a shared or hostPath volume that collision *is* access to another identity's files. Set `fsGroup` to the same value or a PVC-backed container cannot write to its own volume. Verify the image actually starts as that UID rather than assuming — images that look their user up in `/etc/passwd` fail, and finding that out in a cluster costs far more than one `docker run --user`. |
+| **`runAsNonRoot: true` with a high UID** | Root in a container is root on the host the moment anything else fails. **Use a UID of 10000 or above**: a low one collides with a real account on the node, and on a shared or hostPath volume that collision *is* access to another identity's files. Set `fsGroup` to the same value or a PVC-backed container cannot write to its own volume. Verify the image actually starts as that UID rather than assuming — images that look their user up in `/etc/passwd` fail, and finding that out in a cluster costs far more than one `docker run --user`. |
+
+**The threshold is written as `>= 10000` on purpose, matching what checkov's
+`CKV_K8S_40` actually compares.** An earlier draft of this table said "above 10000", and that
+one word made the rule unenforceable at the boundary: a container at exactly 10000 violated the
+sentence while passing the gate, silently and forever. A rule the gate cannot check is not a
+rule, it is an opinion — so where a gate exists, the rule states the gate's threshold and any
+stricter preference is a project decision, not a hidden one.
 
 ### How this is enforced, in three layers that catch different things
 
