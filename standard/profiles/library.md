@@ -58,5 +58,11 @@ cuts a major version twice in a month has made the whole platform unmovable.
 
 ## Published artifacts
 
-- Python package → the group PyPI registry. Consumers pin with a compatible-release
-  specifier (`~=X.Y`) and install through the group index.
+- Python package → **the project's own package registry inside the CI host**, never a public
+  index. The wire format is PyPI's, the destination is not: publishing uses the project's
+  registry URL and the CI job token, so the artifact is readable only by whoever can already
+  read the repository. Say this out loud in the job name and its comment — a job called
+  `publish_pypi` has already been read as "uploads to public PyPI" and refused on that basis,
+  which is a correct reaction to a misleading name.
+- Consumers pin with a compatible-release specifier (`~=X.Y`) and install through the group
+  index.

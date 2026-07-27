@@ -84,12 +84,17 @@ get_unique_semversion:
     - "@@RUNNER_TAG@@"
 
 # ---------------------------------------------------------------------------------------
-# Publish to the group PyPI registry
+# Publish to THIS PROJECT'S OWN package registry inside GitLab — never to public PyPI
 # ---------------------------------------------------------------------------------------
+# The name matters more than it looks. This job was originally called `publish_pypi`, and a
+# reader reasonably concluded it uploaded to public PyPI and refused to run it. It does not:
+# the repository URL is ${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/pypi and the
+# credential is ${CI_JOB_TOKEN}, so the artifact is visible only to whoever can already read
+# this project. "PyPI" here names the wire FORMAT, not the destination.
 # Inline rather than included because the shared templates have no Python publish job yet.
 # If a second repo needs this, MOVE IT INTO @@CI_TEMPLATES_PROJECT@@ instead of copying it —
 # a publish job duplicated across repos is a supply-chain surface maintained in n places.
-publish_pypi:
+publish_package:
   stage: package
   extends:
     - .default_runner
@@ -159,7 +164,7 @@ publish_pypi:
 # Repo-local gates — the second and last exception to "shared CI logic lives upstream".
 #
 # Both jobs enforce a rule the generated CLAUDE.md states as MECHANICALLY ENFORCED ("Doc-sync
-# is enforced", "Standard-drift is enforced"). Unlike publish_pypi above, these are local by
+# is enforced", "Standard-drift is enforced"). Unlike publish_package above, these are local by
 # NATURE rather than because the shared templates have not caught up yet:
 #
 #   * they validate THIS repository's own files — the CLAUDE.md generated here, this repo's
