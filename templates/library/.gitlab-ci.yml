@@ -110,7 +110,19 @@ publish_package:
     # fire, and creating a tag to make it fire would also break GitVersion, which computes
     # the version from the branch graph plus `next-version` precisely because there are no
     # tags to read.
-    - if: $CI_COMMIT_BRANCH == "rc" || $CI_COMMIT_BRANCH == "release"
+    # `dev` publishes too, and that is deliberate rather than lax. GitVersion gives dev builds
+    # 0.1.0-dev.N, which PEP 440 normalises to 0.1.0.devN — a PRE-RELEASE. pip does not resolve
+    # pre-releases unless a consumer pins one exactly, so an accidental
+    # `pip install <dist>` still cannot pick a dev build up.
+    #
+    # Gating publication on `rc` alone looks tidier and is a trap for a library with in-house
+    # consumers: every consumer then waits on an approval-gated dev -> rc promotion for each
+    # library change. In this group that is exactly what happened — seven services could not
+    # build because the library they all import had never been published.
+    #
+    # `rc` and `release` keep their meaning. What this buys is that a consumer can build
+    # against a change before anyone decides it is a candidate.
+    - if: $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "rc" || $CI_COMMIT_BRANCH == "release"
       when: on_success
     # Everything else — feature branches, dev, MRs — builds and tests but never publishes.
     # An accidental publish cannot be undone: PyPI-style registries refuse re-uploads of a

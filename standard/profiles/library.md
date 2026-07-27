@@ -66,3 +66,9 @@ cuts a major version twice in a month has made the whole platform unmovable.
   which is a correct reaction to a misleading name.
 - Consumers pin with a compatible-release specifier (`~=X.Y`) and install through the group
   index.
+- **`dev` publishes as well as `rc` and `release`.** A library exists to be consumed, and
+  gating publication on `rc` alone means every consumer waits on an approval-gated promotion
+  for each change. That is safe only in appearance: dev builds carry a PEP 440 pre-release
+  version (`0.1.0.devN`), which pip refuses to resolve unless a consumer pins it exactly, so
+  nothing picks one up by accident. Recorded because this group learned it the expensive way —
+  seven services could not build against a library that had never once been published.
