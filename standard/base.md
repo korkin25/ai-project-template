@@ -456,6 +456,35 @@ again, one layer down.
 The retrofit is real work: a service that has been running without any of this needs it added,
 and that is a ticket like any other. What it is not is optional.
 
+## Library documentation is fetched, not recalled
+
+**Before writing code against any library, framework, SDK, CLI or cloud API, fetch its current
+documentation.** Not "if unsure" — by default, including for the ones you are confident about.
+An agent's training data has a cutoff; the library does not, and the gap is invisible from the
+inside. A confidently wrong API call is more expensive than a lookup, because it looks correct
+in review and fails at runtime.
+
+The tool for this here is **`context7`** — an MCP server serving version-current library docs.
+Prefer it over a web search for library questions: search returns whatever ranked well,
+frequently a blog post about a version three majors behind.
+
+**Use it for:** API syntax and signatures, configuration keys, migration between versions,
+library-specific debugging, CLI flags, setup and installation steps.
+
+**Do not use it for:** business logic, refactoring, code review, general programming
+questions, or anything about *this* codebase. Those are not documentation lookups, and reaching
+for a docs tool there wastes a round trip and answers a question nobody asked.
+
+The pattern this prevents is specific: an agent writes a call from memory, the linter and the
+type checker both pass because the symbol still exists, and the behaviour changed in a minor
+release two years ago. **A deprecation the docs would have shown you costs one lookup; the same
+deprecation found in production costs an incident.** The same reasoning already governs pinned
+versions and the monthly audit — this is the same discipline applied at the moment code is
+written rather than at the moment it is upgraded.
+
+Which MCP servers a project runs, and where they live, is a project decision recorded in its
+own docs — never here.
+
 ## Human authentication is delegated, never implemented
 
 **No service in this group implements a login.** Not a username/password form, not a session
