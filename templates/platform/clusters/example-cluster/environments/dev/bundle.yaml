@@ -22,13 +22,29 @@ vaultPathPrefix: dev
 #    name that describes somebody else's registry.
 # 2. It also silenced a checkov false positive. `CKV_SECRET_6` (Base64 High Entropy String)
 #    fires on the *name* of a Kubernetes Secret, because an entropy detector cannot tell a
-#    reference from a payload. Note what does NOT fix it, all measured rather than assumed:
-#    quoting the value (single or double) changes nothing, since the check runs on the parsed
-#    string; an inline `# checkov:skip=CKV_SECRET_6:` comment is ignored, because the secrets
-#    framework does not honour inline suppressions the way the IaC frameworks do; and adding
-#    the id to `skip-check` in `.checkov.yaml` would disable it repo-wide, which is the one
-#    outcome worth avoiding — a real base64 blob committed into a bundle is precisely the
-#    mistake this scan exists to catch.
+#    reference from a payload. What each alternative actually does, measured on checkov 3.3.1
+#    with one line per file rather than assumed:
+#      - quoting the value, single or double: still FAILED. The check runs on the parsed
+#        string, so the quotes never reach it.
+#      - `# checkov:skip=CKV_SECRET_6:` on the *preceding* line: `Skipped checks: 1`. It
+#        works, and it is counted.
+#      - the same comment appended to the *same* line: the finding disappears entirely —
+#        `Passed 0, Failed 0, Skipped 0`. A control with an ordinary trailing comment still
+#        FAILED, so this is suppression rather than a change in the line's entropy.
+#      - `skip-check` in `.checkov.yaml`: disables the id repo-wide, which is the one outcome
+#        worth avoiding — a real base64 blob committed into a bundle is precisely the mistake
+#        this scan exists to catch.
+#
+#    An earlier version of this comment claimed the secrets framework ignores inline
+#    suppressions altogether. That was false, and it had been written from a single
+#    same-line test whose silence was read as "no effect" when it was in fact total
+#    suppression — the two are indistinguishable without the control above.
+#
+#    Prefer the preceding-line form to the same-line one **when a skip is warranted at all**:
+#    only that form appears in the report as `Skipped`, and a suppression nobody can count is
+#    a suppression nobody can review. Here no skip is warranted, because the placeholder fixes
+#    the actual defect rather than hiding its symptom, and leaves the check live for a real
+#    payload.
 imagePullSecret: <image-pull-secret>
 interval: 30m
 

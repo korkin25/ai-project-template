@@ -60,6 +60,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **A false claim about checkov's secrets framework, corrected against measurement**
+  (`PRJ-25`). The worked bundle's comment stated that an inline `# checkov:skip=` is ignored
+  by the secrets framework "the way the IaC frameworks do". It is not. On checkov 3.3.1, one
+  line per file: the skip on the **preceding** line yields `Skipped checks: 1`, and the same
+  comment appended to the **same** line makes the finding vanish entirely — while a control
+  carrying an ordinary trailing comment still fails, which is what separates suppression from
+  a change in the line's entropy. The original claim came from a single same-line test whose
+  silence was read as "no effect" when it was total suppression; without the control the two
+  are indistinguishable. The comment now records all four measured outcomes and prefers the
+  preceding-line form where a skip is warranted at all, because only that form is *counted*
+  as skipped — a suppression nobody can review is worse than one that does not work.
 - **The three advertised enforcement mechanisms now exist** (`PRJ-2`). `standard-drift`
   regenerates `CLAUDE.md` and fails on any difference, distinguishing a drifted file from a
   broken `repo.env` because the fix differs. `doc-sync` gained the GitLab half it never had,
