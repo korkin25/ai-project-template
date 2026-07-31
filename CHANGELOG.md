@@ -60,6 +60,20 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **`check-requirements.py` could not tell "I did not look" from "it is not there"**
+  (`PRJ-26`). A capability marked `required: true` that the script cannot probe — a metrics
+  backend, a log backend, a Kafka-compatible bus — was reported `UNVERIFIED` and then treated
+  exactly like an optional one: absent from the exit code, absent from the stderr block naming
+  what blocks a deploy, and folded into a single advisory list where nothing distinguished a
+  hard requirement from a nice-to-have. A platform could declare both observability backends
+  required, run against a cluster containing neither, and be told only that nine things were
+  worth a look. That is the failure this script exists to prevent, reproduced one level up.
+  Required and optional unverified rows are now counted and printed separately, and an
+  unverifiable **required** capability exits **3**. Deliberately not 1: a capability this
+  script cannot probe can never be cleared by it either, so failing the build on one would
+  make the gate permanently red — and a gate that is always red is one everybody learns to
+  pass with a flag. 3 is separable, so CI decides in the open whether an unconfirmed hard
+  requirement blocks a deploy. Definite absence still outranks it: `MISSING` returns 1 first.
 - **A false claim about checkov's secrets framework, corrected against measurement**
   (`PRJ-25`). The worked bundle's comment stated that an inline `# checkov:skip=` is ignored
   by the secrets framework "the way the IaC frameworks do". It is not. On checkov 3.3.1, one

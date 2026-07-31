@@ -11,11 +11,26 @@ Run it against whichever cluster the current kubecontext points at::
     check-requirements.py --strict              # optional items fail too
     check-requirements.py --context example-cluster
 
-Exit codes: 0 all satisfied · 1 something required is missing · 2 cannot reach the cluster.
+Exit codes: 0 all satisfied · 1 something required is missing · 2 cannot reach the cluster ·
+3 a *required* capability could not be verified by this script.
 
 Data services are reported as UNVERIFIED rather than guessed at: "a Kafka-compatible bus"
 can be satisfied by an operator, a chart or a managed endpoint, and probing for one
 implementation would report a false failure for the others.
+
+Exit code 3 exists because UNVERIFIED previously meant the same thing for a hard requirement
+as for an optional one: neither reached the exit code, and both landed in one advisory list
+where nothing distinguished them. A platform could therefore declare a metrics backend and a
+log backend as `required: true`, run against a cluster containing neither, and be told only
+that nine things are worth a look. That is the failure this whole script exists to prevent,
+reproduced one level up — the verifier could not tell "I did not look" from "it is not there",
+and reported both as silence.
+
+It is deliberately NOT exit 1. A capability this script cannot probe can never be *cleared*
+by it either, so failing the build on one would make the gate permanently red, and a gate
+that is always red is one everybody learns to pass with a flag. 3 is separable: CI decides,
+once and in the open, whether an unverifiable hard requirement blocks a deploy — which is a
+policy question, and belongs to whoever owns the pipeline rather than to this file.
 """
 
 from __future__ import annotations
@@ -131,26 +146,45 @@ class Report:
 
         missing_required = [r for r in self.rows if r[2] == MISSING and r[3]]
         missing_optional = [r for r in self.rows if r[2] == MISSING and not r[3]]
-        unverified = [r for r in self.rows if r[2] == UNVERIFIED]
+        unverified_required = [r for r in self.rows if r[2] == UNVERIFIED and r[3]]
+        unverified_optional = [r for r in self.rows if r[2] == UNVERIFIED and not r[3]]
 
         print(
             f"\n{len([r for r in self.rows if r[2] == OK])} satisfied, "
             f"{len(missing_required)} required missing, "
             f"{len(missing_optional)} optional missing, "
-            f"{len(unverified)} unverified."
+            f"{len(unverified_required)} required unverified, "
+            f"{len(unverified_optional)} optional unverified."
         )
         if missing_required:
             print("\nRequired but missing — the platform cannot be deployed here:", file=sys.stderr)
             for _, item, _, _, note in missing_required:
                 print(f"  - {item}: {note}", file=sys.stderr)
-        if unverified:
-            print("\nVerify by hand (capability, not a fixed implementation):")
-            for _, item, _, _, note in unverified:
+
+        # Split from the optional list on purpose. Both say "this script cannot tell", but for a
+        # hard requirement that sentence is a blocker awaiting a human, and for an optional one it
+        # is a note. Printing them together made the first invisible inside the second.
+        if unverified_required:
+            print(
+                "\nREQUIRED but unverifiable here — a human must confirm each before deploying:",
+                file=sys.stderr,
+            )
+            for _, item, _, _, note in unverified_required:
+                print(f"  - {item}: {note}", file=sys.stderr)
+        if unverified_optional:
+            print("\nOptional, verify by hand (capability, not a fixed implementation):")
+            for _, item, _, _, note in unverified_optional:
                 print(f"  - {item}: {note}")
 
         if missing_required:
             return 1
-        return 1 if (strict and missing_optional) else 0
+        if strict and missing_optional:
+            return 1
+        # After 1, never before it: something definitely absent outranks something merely
+        # unconfirmed, and collapsing the two would hide the actionable case behind the advisory.
+        if unverified_required:
+            return 3
+        return 0
 
 
 def check(reqs: dict[str, Any], cluster: Cluster, report: Report) -> None:
