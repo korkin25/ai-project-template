@@ -9,6 +9,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **An id carries its area: `<PREFIX>-<AREA>-<n>`** (`PRJ-30`). A flat `JAP-57` says only *the
+  fifty-seventh thing anyone wrote down here* — an accident of arrival order. `JAP-CI-7` is
+  legible in a commit subject, a chat message and a grep without the file open beside it. The
+  area comes from the register's own section headings, because inventing a second taxonomy
+  beside the existing grouping is how the two drift. Registers above the repo level use a type
+  instead of a repo prefix — `FEAT-<AREA>-<n>`, `STEP-<AREA>-<n>` — since those ids are cited
+  from repos with prefixes of their own and a reader must know which register to open. Also
+  records that **renumbering has a price paid one of two ways**: carry the old id in a `Was`
+  column plus a map, or break cleanly and rewrite every live reference in the same change.
+  Measured when this group changed scheme: **81 references in seven sibling repositories**,
+  plus commit messages that can never be edited. Either choice is defensible; choosing by
+  accident is not, and the clean break only works if *every* reachable reference is actually
+  rewritten, because nothing catches the one that is missed.
 - **Registers open with their table; the instructions go last** (`PRJ-29`). User rule
   2026-08-01. The reason is a ratio rather than taste: **a register is looked up, not read**,
   so its instructions are read once per person and its rows every session by every agent,

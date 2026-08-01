@@ -1,7 +1,7 @@
 <!-- GENERATED FILE — DO NOT EDIT.
      Sources : standard/base.md + standard/profiles/service.md + standard/repo.env
      Profile : service
-     Sources-SHA256: 88d2eee8949ca6f8b642d841fe61bcc375afe4113adb63203da3143fb90ddb70
+     Sources-SHA256: f4fcbda50c79e013df214538c1ef90900959b2368be6a1224134e2452060fe9c
      Regenerate: ./standard/compose.sh
      Edit the sources, never this file. CI fails a change where the two disagree.
 -->
@@ -326,6 +326,37 @@ repo, and never reused.
 
 Prefixes are **unique across the whole group**, so an id is globally unambiguous and can be
 cited from another repo's `TODO.md` or MR without qualification.
+
+**An id carries its area: `<PREFIX>-<AREA>-<n>`.** `JAP-INFRA-3`, `JAP-CI-7`, `MTCH-DATA-2`.
+The area comes from the register's own section headings — the grouping already exists, and
+inventing a second taxonomy beside it is how the two drift. Numbering restarts at 1 per area.
+
+A flat `JAP-57` says only *the fifty-seventh thing anyone wrote down here*, which is an
+accident of arrival order and nothing else. `JAP-CI-7` is legible in a commit subject, in a
+chat message and in a grep, without the file open beside it. That is the whole benefit and it
+is worth the cost below.
+
+**Registers above the repo level use the same shape with a type instead of a repo prefix** —
+`FEAT-<AREA>-<n>` for a product feature, `STEP-<AREA>-<n>` for a roadmap step. The type is the
+prefix because those ids are cited from repos that have prefixes of their own, and a reader has
+to know which register to open.
+
+### Renumbering has a price, and it is paid in one of two ways
+
+Ids are referenced from other repositories, from merge requests, and **from commit messages
+that can never be edited**. Measured in this group when the scheme changed: 81 references in
+seven sibling repositories alone.
+
+So a renumbering chooses, deliberately and in writing:
+
+- **Carry the old id** — a `Was` column and an old→new map, so every existing reference still
+  resolves, at the cost of a compatibility column that lives forever; or
+- **Break cleanly** — no map, no column, and every live reference rewritten in the same change.
+  What is given up is exact: references in git history become unresolvable, and any frozen
+  source that used the old numbering no longer maps by id.
+
+Either is defensible. **Choosing by accident is not** — and the second only works if *every*
+reachable reference is actually rewritten, because there is no fallback when one is missed.
 
 Work that spans repos gets a **platform id** — the platform repo's own prefix, written
 `<PLATFORM>-<n>` below — recorded there. Each participating repo opens its own local ticket
