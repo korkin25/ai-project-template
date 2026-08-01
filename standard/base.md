@@ -72,9 +72,28 @@ it only makes sense for *this* system, it is architecture and lives in `docs/arc
 
 **Propagation is part of the change, not a follow-up.** A rule added upstream is not finished
 until every repo carrying a generated `CLAUDE.md` has been regenerated from the new sources.
-Until then the group is running two different standards and neither is authoritative. Where
-the standard is vendored per repo rather than referenced, the drift gate is what catches a
-copy that fell behind — which is why that gate is load-bearing rather than cosmetic.
+Until then the group is running two different standards and neither is authoritative.
+
+**And nothing currently catches it — the sentence that used to sit here was false.** It claimed
+the drift gate catches a vendored copy that fell behind. It does not, and cannot:
+`standard-drift` regenerates `CLAUDE.md` from **the repo's own** `standard/` and compares the
+two. A vendored `standard/` that is a year behind upstream passes it forever, because the file
+and its sources agree perfectly with each other. The gate answers *was `CLAUDE.md` hand-edited*,
+never *is this copy current*.
+
+Measured on 2026-08-01, which is what turned this from a theoretical hole into a correction:
+six services were split from this standard within an hour of each other and vendored **three
+different versions of it** — three carrying a rule the other three lack, none carrying a rule
+committed minutes later. Every one of the six passes `standard-drift`.
+
+Two things follow, and the first is free:
+
+- **Vendor from a committed object, never a working tree.** `git archive <sha>` and record the
+  sha. A copy taken from somebody's checkout inherits whatever was uncommitted at that instant
+  and then claims a commit it does not match — which is worse than being behind, because it is
+  behind *and* mislabelled.
+- **A gate that compares the vendored `standard/` against upstream is missing**, and until it
+  exists propagation is a promise kept by memory. That is a ticket, not a footnote.
 
 **The standard obeys itself.** This repository is the first consumer of every rule it
 publishes. If its own `TODO.md`, `CHANGELOG.md` or `AUTOPILOT-LOG.md` does not satisfy a rule
