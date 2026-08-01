@@ -1,7 +1,7 @@
 <!-- GENERATED FILE — DO NOT EDIT.
      Sources : standard/base.md + standard/profiles/service.md + standard/repo.env
      Profile : service
-     Sources-SHA256: f0be5776440bbd363f8c375f31ff4bd28fb958db262e72dd258906405d6bcfd8
+     Sources-SHA256: a31f8afc4e1a98bbc6074f90bc829c34bad8bfcc1d9a62b8c5efd89e5e71c1bd
      Regenerate: ./standard/compose.sh
      Edit the sources, never this file. CI fails a change where the two disagree.
 -->
@@ -32,7 +32,7 @@ whose trigger matches below, and keep them loaded. Working from `CLAUDE.md` alon
 
 | Before you… | Open and read |
 |---|---|
-| do **anything** | `TODO.md` (Current state / next action, open work + backlog) |
+| do **anything** | `TODO.md` (Current state / next action, open work + backlog) and `questions.md` (what is waiting on an answer, and what it blocks) |
 | resume after a break, or pick up someone else's work | `AUTOPILOT-LOG.md` (what was last done, and why) |
 | build or change a **feature/bug** | `README.md` `## Features` (the user-facing feature list), `docs/tests.md` (its test plan), `docs/configuration.md` (env vars), the relevant `src/**` |
 | touch **deploy / CI / containers** | `.gitlab-ci.yml`, the Dockerfile, the chart's `README.md` (plus `.github/workflows/ci.yml` only in a repo that also mirrors to GitHub) |
@@ -128,6 +128,8 @@ Keep docs in lockstep with the code, **in the same change** — never wait to be
 | A new/changed metric, log field or alert threshold | `docs/observability.md` + the dashboard — see *Observability* |
 | Any user-visible change | `CHANGELOG.md` under `## [Unreleased]` |
 | Task started / finished / blocked, or a test's pass status | `TODO.md` |
+| You ask the user something that blocks a ticket | `questions.md` — immediately, with its id, what it blocks, the options and your recommendation |
+| The user answers a question | move the entry to `questions_closed.md` with the answer, the date and **what changed as a result** |
 | An autonomous change of any substance | `AUTOPILOT-LOG.md` — see *Autopilot log* |
 | User asks to build something, or "add for brainstorm" | `TODO.md` |
 
@@ -164,6 +166,52 @@ three.
 The test for whether this is being followed: after any conversation, everything the user
 asked for is findable in a file. If it is only in the chat, it is already lost.
 
+### Questions go in `questions.md` — and being blocked never blocks everything
+
+The same reasoning that puts every request in `TODO.md` applies, with more force, to every
+question **you** ask the user. A request the user made is at least something they remember
+making. A question you asked and they did not answer exists only in a chat message that both
+of you have scrolled past, and it is the single most reliable way for work to stall invisibly:
+nothing is marked blocked, nobody is waiting on anything they know about, and the task simply
+stops being touched.
+
+**Every open question is written into `questions.md` the moment it is asked**, with an id
+`<PREFIX>-Q<n>` from the same sequence rules as tickets — mandatory, sequential, never reused.
+A question carries four things, and the last two are what make it answerable rather than
+merely recorded:
+
+| | |
+|---|---|
+| **What is actually being asked** | in one sentence, decidable — not "what about caching?" |
+| **What it blocks** | the ticket ids that cannot proceed. If it blocks nothing, it is not a question, it is curiosity — ask it inline and do not file it |
+| **The options**, with their consequences | a question with no options is a request for someone else to do the design |
+| **Your recommendation, and why** | the person answering should be able to reply "yes" and be done. Making them start from a blank page is how a question goes unanswered for a month |
+
+**When it is answered, the entry moves to `questions_closed.md`**, carrying the answer, who
+gave it, the date, and — the part usually skipped — *what changed as a result*: the commit, the
+decision id, the ticket that unblocked. A closed question with no consequence recorded is
+indistinguishable from one that was answered and then forgotten anyway.
+
+Both files live beside `TODO.md`. `questions.md` is open questions only, exactly as `TODO.md`
+is open work only.
+
+#### Blocked on an answer is a status, not a stop
+
+A task waiting on an unanswered question gets **`❓`** in `TODO.md`, **citing the question id**
+in the row. That is a fifth state and it is none of the others: `⬜` invites an agent to start
+it, `⏸️` says a decision was taken and it was "not now", and `🔴` says this is blocking other
+work. `❓` says something narrower and more useful — *one person owes one answer, and here is
+where it is written down.*
+
+**Everything not blocked by that question continues.** This is the half that gets lost: an
+unanswered question is a reason to stop **the tasks that depend on it**, and it is not a reason
+to stop. An agent that idles waiting for an answer has turned one person's inbox into the
+project's critical path. Work the rest of `TODO.md`, and let the answer arrive when it arrives.
+
+The failure this prevents, stated plainly because it is common: three questions go unanswered,
+each quietly stalls a different task, none of the three is written down, and a month later the
+project has visibly not moved while nobody can say what it is waiting for.
+
 ### Status is half the record — keep it current
 
 Logging a task and then never touching its row again produces a file that is worse than an
@@ -178,6 +226,15 @@ not when the batch is done:
   two people do the same work.
 - Blocked → say so **in the row**, naming what it is blocked on and who can unblock it. A
   blocker living only in a chat message is a blocker nobody will find.
+- **Paused → `⏸️`, with who paused it and what would resume it.** This is a third state, not a
+  synonym for either neighbour, and conflating it with them is what makes the conflation
+  expensive. `⬜` says *nobody has started this*, and an autonomous agent is entitled to pick a
+  `⬜` row up — so marking deliberately deferred work `⬜` is how an agent restarts something a
+  human just chose to stop. `🔴` says *this is blocking something and needs clearing*, which
+  points a reader at work that does not exist. `⏸️` says the third thing: **the decision has
+  already been taken, and it was "not now"** — there is nothing to unblock and nothing to pick
+  up. Write what would change that, because a pause with no resume condition is an abandonment
+  that nobody has admitted to yet.
 - Done **and verified** → move the row to `CHANGELOG.md`. Not marked `✅` and left in place:
   `TODO.md` is open work, never a history, and a file where done and open rows sit together
   stops being scannable at about twenty rows.

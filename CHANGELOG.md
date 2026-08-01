@@ -9,6 +9,18 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`questions.md` / `questions_closed.md`, and `❓` as a fifth ticket status** (`PRJ-27`). A
+  request from the user at least survives as something they remember asking for. A question
+  *you* asked that went unanswered exists only in a chat message both of you have scrolled
+  past, and it is the most reliable way for work to stall invisibly: nothing is marked, nobody
+  knows they are being waited on, and the task simply stops being touched. Every blocking
+  question is now filed with an id, what it blocks, the options and a recommendation — the last
+  two so the answer can be "yes" rather than a blank page. **`❓` is deliberately not `⬜`,
+  `⏸️` or `🔴`**: `⬜` invites an agent to start the work, `⏸️` says a decision was taken,
+  `🔴` says this blocks others. `❓` says one person owes one answer and names where it is
+  written. The other half of the rule matters as much: **being blocked never blocks
+  everything** — an unanswered question stops the tasks that depend on it and nothing else,
+  because an agent idling on an answer has turned one person's inbox into the critical path.
 - **The standard is generated, not hand-maintained.** `standard/base.md` holds what binds
   every repository; `standard/profiles/{service,library,platform,infra}.md` hold what binds
   one kind; `standard/compose.sh` composes them with `standard/repo.env` into `CLAUDE.md`,
