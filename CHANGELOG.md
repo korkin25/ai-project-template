@@ -9,6 +9,21 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Hardening has two test surfaces, and only the cheap one gets tested** (`PRJ-33`). A
+  container that *starts* under a restriction has not been shown to *work* under it: startup is
+  one code path exercised in seconds, operation is every path the workload takes afterwards.
+  Both examples measured on a CI runner under `readOnlyRootFilesystem`. The image was verified
+  to register, run and answer its liveness probe writing only into the chart's `emptyDir` — all
+  true, and all about startup; the job-trace writer then called `os.CreateTemp("")` and the
+  first real pipeline failed five jobs in a second with `read-only file system`, surfacing as
+  `runner_system_failure` **with an empty log**, which reads as a broken pipeline rather than a
+  broken runner. Worse, a **UID with no `/etc/passwd` entry** fails nothing at all: runc falls
+  back to `HOME=/`, the process reads a config nobody intended, logs `Configuration loaded`,
+  reports healthy — and never picks up a single unit of work. **A health check that passes
+  while the component does nothing is the most expensive shape of bug available**, and a high
+  UID is exactly how you get one. Rule: give every writable path an explicit `emptyDir` —
+  `/tmp` first, because the standard library reaches for it without asking — and exercise the
+  workload rather than its startup. One real unit of work is the whole test.
 - **Minting a third-party credential, under five conditions** (`PRJ-32`). *Safe autonomy* puts
   creating a credential behind explicit approval and that stays the default — but a project may
   grant a standing exception for credentials **its own platform needs to exist** (a runner

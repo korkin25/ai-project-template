@@ -829,6 +829,32 @@ sentence while passing the gate, silently and forever. A rule the gate cannot ch
 rule, it is an opinion — so where a gate exists, the rule states the gate's threshold and any
 stricter preference is a project decision, not a hidden one.
 
+### Hardening has two test surfaces, and only the cheap one gets tested
+
+**A container that starts under a restriction has not been shown to work under it.** Startup and
+operation are different surfaces: startup is one code path exercised in seconds, operation is
+every path the workload takes for the rest of its life. Verifying the first and inferring the
+second is the mistake this section exists to name, because the resulting failure is silent and
+wears somebody else's clothes.
+
+Measured here, both from `readOnlyRootFilesystem` on a CI runner:
+
+- The image was run with `--read-only` and confirmed to register, run and answer its liveness
+  probe writing only into the chart's `emptyDir`. All true — **about startup.** The job-trace
+  writer then called `os.CreateTemp("")`, and the first real pipeline failed all five jobs in
+  about a second with `create job trace: open /tmp/trace…: read-only file system`. In the UI
+  that is `runner_system_failure` **with an empty log** — it reads as a broken pipeline rather
+  than a broken runner, which is where the hours go.
+- A **UID with no `/etc/passwd` entry** is worse, because nothing fails at all. runc falls back
+  to `HOME=/`, the process reads its config from a path nobody intended, logs
+  `Configuration loaded`, reports healthy — and never picks up a single unit of work. A health
+  check that passes while the component does nothing is the most expensive shape of bug
+  available, and a high UID is exactly how you get one.
+
+So: **give every writable path an explicit `emptyDir`** — `/tmp` first, because the standard
+library reaches for it without asking — and **exercise the workload, not its startup**, before
+believing a hardening change. One real unit of work is the whole test.
+
 ### How this is enforced, in three layers that catch different things
 
 One gate is not enough, and the reason is worth stating: each layer sees something the others
