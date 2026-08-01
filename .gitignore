@@ -25,3 +25,6 @@ secrets.*
 .idea/
 .vscode/
 .DS_Store
+
+# Isolated worktrees created for agent runs — scaffolding, never repository content.
+.claude/worktrees/
