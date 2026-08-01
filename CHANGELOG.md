@@ -9,6 +9,20 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Minting a third-party credential, under five conditions** (`PRJ-32`). *Safe autonomy* puts
+  creating a credential behind explicit approval and that stays the default — but a project may
+  grant a standing exception for credentials **its own platform needs to exist** (a runner
+  token, a registry token, a deploy key), because the alternative is a human copying a value out
+  of a web page: the slowest step in any bootstrap and the one likeliest to leak it into a
+  terminal. The grant is real only with all five: the value never leaves the pipe (minted and
+  stored in **one command**, since most such endpoints return it **once**); narrowest scope that
+  works; written where a bootstrap is read, **including how to revoke it**; the platform's own
+  credential rather than a person's; and not in a repository the project holds read-only.
+  **This completes *generated, never typed* rather than weakening it** — that rule already
+  carved out credentials issued elsewhere, and this says who may go and get them. The carve-out
+  assumed a human must, which is frequently untrue: in this group a runner token blocked a
+  ticket for days on that assumption, inherited from a legacy flow where the value really did
+  live only in a settings page.
 - **An id carries its area: `<PREFIX>-<AREA>-<n>`** (`PRJ-30`). A flat `JAP-57` says only *the
   fifty-seventh thing anyone wrote down here* — an accident of arrival order. `JAP-CI-7` is
   legible in a commit subject, a chat message and a grep without the file open beside it. The

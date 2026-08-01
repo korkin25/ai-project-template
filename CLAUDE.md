@@ -1,7 +1,7 @@
 <!-- GENERATED FILE — DO NOT EDIT.
      Sources : standard/base.md + standard/profiles/service.md + standard/repo.env
      Profile : service
-     Sources-SHA256: f4fcbda50c79e013df214538c1ef90900959b2368be6a1224134e2452060fe9c
+     Sources-SHA256: b979dfe348d64428cff7862942f5fa8ffe8ca590c227d2b3b3e86343c92acabf
      Regenerate: ./standard/compose.sh
      Edit the sources, never this file. CI fails a change where the two disagree.
 -->
@@ -720,6 +720,35 @@ the store.
 - **No seeding step in a runbook.** A workload that cannot start until somebody runs
   `vault kv put` is a workload that cannot be brought up by automation, cannot be rebuilt from
   zero without a human, and whose runbook rots the day that human is unavailable.
+
+### Minting a third-party credential — permitted only under all five conditions
+
+*Safe autonomy* puts creating a credential behind explicit approval, and that stays the default.
+A project **may** grant a standing exception for the credentials its own platform needs to
+exist — a CI runner token, a registry token, a deploy key — because the alternative is a human
+copying a value out of a web page, which is both the slowest step in any bootstrap and the one
+most likely to leak it into a terminal.
+
+The grant is real only with **all five** of these, and a project records it having said so:
+
+| | |
+|---|---|
+| **The value never leaves the pipe** | minted and stored **in the same command**. Never through a variable that is later echoed, never into a file, never into a log, a chat message or a commit. Most such endpoints return the value **once** — a later `GET` will not give it back — so an accidental discard means revoking and re-minting, not retrieving. |
+| **Narrowest scope that works** | the API usually offers a convenient wide default. Minting `api` where `read_registry` suffices is not a shortcut, it is a larger credential living longer. |
+| **It is written down where a bootstrap is read** | what was minted, why, where it lives, and **how to revoke it**. A credential nobody can find is a credential nobody can rotate. |
+| **It is the platform's own, not a person's** | a token *for* the system, issued to the system. A user's personal access token, their cloud key, a vendor password — those stay theirs, and the standing grant does not reach them. |
+| **Not in a repository the project holds read-only** | a credential minted for a repo nobody may commit to has nowhere legitimate to be recorded. |
+
+**This does not weaken *generated, never typed*, it completes it.** That rule already carves out
+credentials issued elsewhere; this says who may go and get them. The carve-out was written
+assuming a human must — frequently untrue, and worth checking before a ticket sits blocked on a
+person. In this group a runner token blocked one for days on exactly that assumption, inherited
+from a legacy flow where the value really did live only in a settings page.
+
+**What is still not covered**, so the grant does not quietly widen: anything outward-facing,
+anything that authenticates *as a person*, and any credential whose blast radius exceeds the
+platform it serves. When unsure which side a credential falls on, that is the question the grant
+was never meant to answer for you.
 
 ### Where it does NOT apply, stated so the rule stays usable
 
