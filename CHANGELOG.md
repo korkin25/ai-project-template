@@ -9,6 +9,18 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Registers open with their table; the instructions go last** (`PRJ-29`). User rule
+  2026-08-01. The reason is a ratio rather than taste: **a register is looked up, not read**,
+  so its instructions are read once per person and its rows every session by every agent,
+  forever — any preamble taxes the second population to serve the first. Measured before the
+  rule existed: **51% of a platform `TODO.md` was preamble**, 106 lines of it before the first
+  row of the thing the file is for. It also decides what a cold session sees: an agent told to
+  read `TODO.md` before acting reads the top, and if the top is prose about the file it has
+  spent its attention on conventions instead of state. A real Markdown table, never ASCII-art
+  boxes — the rendered output has borders while the source stays diffable, greppable by id and
+  survives a cell changing width, which drawn boxes fail on the first edit. One exception, kept
+  to a paragraph: *Current state / next action* may sit above the table, because a cold session
+  needs it before anything else.
 - **What a green MR pipeline actually proves, and the setting that was never on** (`PRJ-28`).
   Measured, not assumed: a `merge_request_event` pipeline runs on the **source branch's own
   commit** — the target is not merged in — so a tick proves the branch is green in isolation

@@ -1,7 +1,7 @@
 <!-- GENERATED FILE — DO NOT EDIT.
      Sources : standard/base.md + standard/profiles/service.md + standard/repo.env
      Profile : service
-     Sources-SHA256: 7c1130bf035da039a0b2b55e8d9d8f44f2076273d4e40f16996cd470f43cc9d5
+     Sources-SHA256: 88d2eee8949ca6f8b642d841fe61bcc375afe4113adb63203da3143fb90ddb70
      Regenerate: ./standard/compose.sh
      Edit the sources, never this file. CI fails a change where the two disagree.
 -->
@@ -184,6 +184,38 @@ three.
 
 The test for whether this is being followed: after any conversation, everything the user
 asked for is findable in a file. If it is only in the chat, it is already lost.
+
+### Layout: the data first, the instructions last
+
+**`TODO.md`, `questions.md` and every other register open with their table.** Above it: the
+`#` heading, and at most one line saying what the file is. Everything explaining *how to use
+the file* — the legend, the maintenance rule, standing rules, the format of an entry, the
+reasoning behind a status — goes **below** the data, under a `## How to use this file` heading.
+
+The reason is a ratio, not taste. **A register is looked up, not read.** The instructions are
+read once by each person, ever; the rows are read every session, by every agent, forever. Any
+preamble taxes the second population to serve the first, and the tax compounds with every
+lookup. Measured in this group before the rule existed: **51% of a platform `TODO.md` was
+preamble** — 106 lines of it before the first row of the thing the file is for.
+
+It also decides what a cold session sees. An agent told to read `TODO.md` before acting reads
+the top of it; if the top is prose about the file, the agent has spent its attention learning
+the conventions instead of the state.
+
+Rules that follow:
+
+- **One table, one row per item, and a status column** — so the state is scannable in a single
+  pass rather than reconstructed from prose. Sections may split the table by area; each is
+  still a table.
+- **A real Markdown table, never ASCII-art boxes.** The rendered result has borders; the source
+  stays diffable line by line, greppable by id, and survives a cell changing width. Drawn boxes
+  fail all three the first time anyone edits one.
+- **Detail belongs inside the row**, using `<br>` for paragraphs, not in a prose section
+  underneath that the row points at. A row a reader has to leave to understand is a row that
+  goes stale on its own.
+- **The exception, and it is one line:** a *Current state / next action* block may sit above the
+  table, because a cold session needs it before anything else. Keep it to a short paragraph. If
+  it grows past that, it has stopped being a pointer and become a document.
 
 ### Questions go in `questions.md` — and being blocked never blocks everything
 
