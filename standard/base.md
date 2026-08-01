@@ -905,7 +905,35 @@ and ask** — an unasked question is cheaper than an unsafe action.
 
 - **Branch, don't push to protected branches.** Every change lands via an MR to `dev`; never
   commit straight to `dev`/`rc`/`release`.
-- **Green before merge.** Nothing merges or releases without green CI.
+- **Green before merge.** Nothing merges or releases without green CI. **Turn on the host's
+  "pipeline must succeed" setting** — otherwise this is a sentence in a file, and the host will
+  cheerfully merge a red MR for anyone who clicks the button. One exception, and it is the
+  reason to check rather than set it blindly: a repository with **no CI at all** must leave it
+  off, because "must succeed" with nothing to succeed can block every merge forever.
+- **A green MR pipeline does not test the merge — it tests the branch.** On GitLab Free a
+  `merge_request_event` pipeline runs on the **source branch's own commit**; the target is not
+  merged in. So a tick proves the branch is green *in isolation*, on a snapshot of the target
+  taken whenever the branch was cut. The mechanisms that close this — merged-results pipelines
+  and merge trains — are paid features, so on Free the gap is real and permanent.
+
+  **Before merging, compare two sets:** the files the MR changes, and the files the target has
+  changed since the branch point. **If they do not intersect, merge.** If they do, merge the
+  target into the source, let CI re-run, and merge that.
+
+  That test rather than a blanket "always re-verify" for a reason worth stating: blanket
+  re-verification **serialises** the queue. With six MRs open against one target, every merge
+  invalidates the other five, and a 21-job pipeline times five is the price of a risk that in
+  most of those five is exactly zero. Spend it where the sets overlap — which is where it has
+  actually bitten: a shared `TODO.md` that every branch edits, a lockfile, a registry of
+  contracts.
+
+  Two things this does **not** fix, so nobody mistakes it for a guarantee. It is a **race with a
+  shorter window**, not a closed one: the target can move between the re-run and the merge.
+  And rebasing instead of merging is not available where `feature/*` is protected against
+  force-push — the server-side rebase is a force-push, so a repo that protects its feature
+  branches (which it should, so CI can write `.versions/*.env` back) cannot use a semi-linear or
+  fast-forward merge method at all. Pick the merge method knowing that, rather than discovering
+  it when the Rebase button returns a permission error.
 - **Verify, don't assume.** Report real command/test output; if a step failed or was skipped,
   say so; never mark work done without proof.
 - **Small blast radius.** One task per branch, one repo per branch; no unrelated changes;

@@ -9,6 +9,21 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **What a green MR pipeline actually proves, and the setting that was never on** (`PRJ-28`).
+  Measured, not assumed: a `merge_request_event` pipeline runs on the **source branch's own
+  commit** — the target is not merged in — so a tick proves the branch is green in isolation
+  against a snapshot of the target taken when the branch was cut. Merged-results pipelines and
+  merge trains close this and are **paid**, so on Free the gap is permanent. The rule added is
+  a set comparison rather than a blanket re-verify: **merge only if the MR's changed files do
+  not intersect what the target changed since the branch point**, otherwise merge the target
+  in and re-run. Blanket re-verification serialises the queue — six open MRs against one
+  target means every merge invalidates five others, and 21 jobs times five buys down a risk
+  that in most of them is zero. Also recorded: this shortens the race, it does not close it;
+  and **a repo that protects `feature/*` against force-push cannot use semi-linear or
+  fast-forward merging at all**, because the server-side rebase is a force-push. Separately,
+  *green before merge* was enforced by nothing — the host's "pipeline must succeed" setting
+  was `false` everywhere it was checked, with the one documented exception that a repo with no
+  CI must leave it off or block every merge forever.
 - **`questions.md` / `questions_closed.md`, and `❓` as a fifth ticket status** (`PRJ-27`). A
   request from the user at least survives as something they remember asking for. A question
   *you* asked that went unanswered exists only in a chat message both of you have scrolled
