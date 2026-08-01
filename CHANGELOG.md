@@ -141,6 +141,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **The service Dockerfile invalidated its dependency layer on every commit** (`PRJ-34`). It
+  copied `src/` and then ran one `pip install .`, so the layer holding every dependency was
+  keyed on the source — and no registry layer cache could help, because that key changed with
+  each commit. Measured before the split: a build spent about **70 s re-downloading wheels it
+  already had**, at 130–315 kB/s. Dependencies now install from `pyproject.toml` alone against
+  a stub package, so that layer's key is the manifest and `--cache-from` reuses it wherever
+  dependencies did not move; the real source arrives afterwards and installs with `--no-deps`,
+  which downloads nothing. `--no-cache-dir` is dropped and pip's cache is mounted, since it was
+  disabling exactly what the change is trying to obtain. Half a fix on its own: the other half
+  is that the cache fallback pointed at `main`/`master` in a group whose trunk is `dev`, so
+  every feature branch read three empty refs and built cold.
 - **`check-requirements.py` could not tell "I did not look" from "it is not there"**
   (`PRJ-26`). A capability marked `required: true` that the script cannot probe — a metrics
   backend, a log backend, a Kafka-compatible bus — was reported `UNVERIFIED` and then treated

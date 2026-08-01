@@ -35,7 +35,6 @@ WORKDIR /src
 # line — the failure is at metadata generation, and its message never mentions the Dockerfile.
 COPY README.md ./
 COPY pyproject.toml ./
-COPY src/ ./src/
 
 # The pip_index secret carries the authenticated GitLab PyPI URL, so group-internal packages
 # resolve without the token ever entering an image layer or `docker history`. CI maps it via
@@ -45,12 +44,35 @@ COPY src/ ./src/
 # `--extra-index-url` with an empty value swallows the following `.` argument and pip dies
 # with "You must give at least one requirement to install". The `|| true` on `cat` covers a
 # local `docker build` with no secret mounted at all.
-RUN --mount=type=secret,id=pip_index \
+#
+# TWO INSTALLS, AND THE SPLIT IS THE WHOLE POINT.
+#
+# The obvious Dockerfile copies `src/` and then runs one `pip install .`. That makes the
+# dependency layer depend on the source, so **every commit re-downloads every dependency** —
+# and no registry layer cache can help, because the layer's key changed. Measured before this
+# split: a build spent ~70 s pulling wheels at 130-315 kB/s that it already had last time.
+#
+# So dependencies install from `pyproject.toml` ALONE, against a stub package. That layer's
+# key is the manifest, which changes rarely, so `--cache-from` reuses it across every build
+# where dependencies did not move. The real source arrives afterwards and installs with
+# `--no-deps`, which downloads nothing.
+#
+# The stub exists because `pip install .` builds the project, and the project needs a package
+# directory to exist. It is overwritten by the real `COPY src/` below; nothing of it survives.
+RUN --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=secret,id=pip_index \
     EXTRA=""; \
     URL="$(cat /run/secrets/pip_index 2>/dev/null || true)"; \
     [ -n "$URL" ] && EXTRA="--extra-index-url $URL"; \
     python -m venv /opt/venv; \
-    /opt/venv/bin/pip install --no-cache-dir $EXTRA .
+    mkdir -p src/@@PKG@@ && : > src/@@PKG@@/__init__.py; \
+    /opt/venv/bin/pip install $EXTRA .
+
+# The source layer. Changes on every commit, and costs nothing because `--no-deps` resolves
+# and downloads nothing — everything it needs is already in /opt/venv from the layer above.
+COPY src/ ./src/
+RUN --mount=type=cache,target=/root/.cache/pip \
+    /opt/venv/bin/pip install --no-deps .
 
 # ---------------------------------------------------------------------------------------
 # Runtime — the published image
