@@ -281,9 +281,42 @@ not when the batch is done:
   that nobody has admitted to yet.
 - Done **and verified** → move the row to `CHANGELOG.md`. Not marked `✅` and left in place:
   `TODO.md` is open work, never a history, and a file where done and open rows sit together
-  stops being scannable at about twenty rows.
+  stops being scannable at about twenty rows. **Which `CHANGELOG.md`** is not always obvious in a
+  multi-repo group — see immediately below.
 - Abandoned or superseded → delete the row and say why in the entry that supersedes it.
   Silently leaving it is indistinguishable from forgetting.
+
+#### Local work goes in the local CHANGELOG — a platform feature cites the parts it is made of
+
+A group has two kinds of finished work and they must not land in the same file.
+
+**Work a repo did to itself is local.** A service's ticket moves to *that service's*
+`CHANGELOG.md`. An infra repo's ticket moves to *that infra repo's*. This holds even when the
+work was requested from outside: the repo that changed is the repo that records it, because the
+question a changelog answers is *what changed here, and what do I revert to*.
+
+**A platform feature is usually several local features wearing one name.** "Candidates get
+matched to jobs" is a topic in one repo, a consumer in another, a table in a third and a bundle
+version in a fourth. That feature moves to the **platform** `CHANGELOG.md` — and only when the
+whole thing is real — and its entry **cites the local ticket ids that had to change**:
+
+```markdown
+- **Candidate↔job matching is live in `dev`** (PRJ-7). Parts: `SVC-14` (emit `job.matched`),
+  `OTH-9` (consume it), `DB-4` (the `match` table), platform bundle `matching` 0.3.1.
+```
+
+Three failures this prevents, each of which has actually happened somewhere:
+
+- **The platform changelog filling with per-service noise**, until the one file that is supposed
+  to answer *what is running* reads like eleven merged git logs.
+- **A service's own history scattered** across a repo nobody working in that service reads.
+- **A platform entry written when the first part lands.** It claims a feature exists while three
+  of its four pieces are unbuilt — and unlike a `TODO` row, a changelog entry is read as fact.
+  The rule that stops this is the same as everywhere else here: *done* means the whole thing was
+  verified working, not that the last MR merged.
+
+The test: **could this entry be true while another repo is still unchanged?** If yes it is local.
+If it can only be true once several repos agree, it is a platform entry and it names them.
 
 The failure this prevents is specific and common: a batch of work finishes, the code and the
 `CHANGELOG` are perfect, and every ticket still reads `⬜`. The next session — or the next
@@ -522,6 +555,41 @@ verifier nobody checked is worse than no verifier, because it is believed.
   `auto-tests/`. Tier-(a) is wired into CI to run automatically. Every scenario/methodology
   is also **used during development**, not only in CI.
 - `TODO.md` tracks the pass/fail status of each test of the current feature.
+
+### A gate is blocking, or it is not a gate — `allow_failure` is banned on checks
+
+**No check that reports findings carries `allow_failure: true`.** Not linting, not complexity,
+not type checking, not tests, and — stated separately because the user made it explicit —
+**every SAST job runs with `allow_failure: false`, without exception.** This binds every
+language and every tool, not just the Python ones that prompted the rule.
+
+A check that cannot fail the build is not a gate; it is a report, and nobody reads it. Worse is
+the state this rule was written from: a job that has **never once passed** and is soft-failed, so
+the pipeline is green and the red square is decoration. Measured in this group — `python-quality`
+failed on every `libs/shared` pipeline for its entire history on one `xenon` rank-C block, and
+nobody noticed, because `allow_failure: true` meant nothing ever depended on it.
+
+That teaches something expensive: **everyone learns to skip that square.** The next finding in
+that job will also be ignored, and there is no reason to think the next one is cosmetic.
+
+**Order matters, and getting it backwards stops all work.** Make the check *pass*, then make it
+*blocking*. Deleting `allow_failure` from a currently-red job converts a soft red into a hard red
+and blocks every merge in the repo until someone fixes a finding they did not plan for. The
+sequence is: fix the finding → confirm the check is green → remove `allow_failure` → merge.
+
+**A scoped "nothing to do" exit code is not an exception, it is a defect to remove.** The
+tempting shape is `allow_failure: exit_codes: [77]`, where 77 means *the artefact under scan does
+not exist*. It reads as narrow and safe. It is not: it converts **"the scan never ran"** into a
+pass, which is the precise failure a security gate exists to prevent — and this group has already
+lost image scanning to exactly that, silently, for as long as the job had been green. If a
+scanner can find nothing to scan, fix the pipeline so the artefact is there when it runs. The
+check stays hard.
+
+**Making gates blocking raises the price of a flake, so pay it deliberately.** A transient
+infrastructure fault that used to produce a soft red now stops a merge. The answer is a
+`retry:` policy for **infrastructure-class failures only** — the runner could not start, could
+not pull its helper image, could not reach the API. Never retry a `script_failure`: that is the
+finding itself, and retrying it is `allow_failure` wearing a different hat.
 
 **Release gate:**
 
