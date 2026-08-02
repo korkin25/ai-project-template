@@ -94,6 +94,25 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # low uids that can collide with host system accounts; fixed because the chart pins
 # runAsUser/runAsGroup to the same numbers and the two must not drift apart.
 # --no-create-home: there is no writable home under a read-only rootfs; HOME=/tmp covers it.
+# Remove perl-base. It is `Essential: yes` in Debian, which is why this needs the override —
+# but `apt-cache rdepends --installed perl-base` returns an EMPTY list in this image, so
+# nothing here uses it, and a Python service never invokes perl.
+#
+# The reason this is a removal rather than an upgrade: four CRITICAL CVEs in perl-base
+# (CVE-2026-13221, -42496, -57433, -8376) have **no fix in Debian stable**, and only two of
+# the four are fixed even in unstable. The base tag already floats, so rebuilding picks up
+# whatever Debian has — and Debian has nothing. Bumping would change the digest, keep the
+# findings, and look like action.
+#
+# Removing the package removes the finding surface instead of moving it to the next advisory,
+# and it shrinks the image. Verified on `python:3.12-slim`: purge exits 0, and afterwards
+# ssl, sqlite3, hashlib, zlib, ctypes, lzma, bz2 all import and pip still runs.
+#
+# Runtime stage only. The builder may legitimately need it for a package's install scripts,
+# and it is discarded there anyway.
+RUN dpkg --purge --force-remove-essential --force-depends perl-base \
+ && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd --gid 10001 app \
  && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin app
 
