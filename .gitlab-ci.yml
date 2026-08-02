@@ -8,7 +8,7 @@
 # ${DOCKERFILE}, helm needs ${CHART_PATH}/Chart.yaml), so there is nothing language-specific
 # to list here.
 #
-# Shared CI logic belongs in the templates repo, never in this file. The two local jobs at
+# Shared CI logic belongs in the templates repo, never in this file. The three local jobs at
 # the bottom are a deliberate, argued exception — see the comment above them.
 #
 # Required project/group CI/CD variables: CI_REGISTRY, CI_REGISTRY_USER, CI_REGISTRY_PASSWORD.
@@ -58,13 +58,15 @@ variables:
 # =============================================================================
 # Repo-local gates — the exception to "shared CI logic belongs in the templates repo".
 #
-# Both jobs enforce a rule CLAUDE.md states as mechanically enforced, and both are local
+# Each job enforces a rule CLAUDE.md states as mechanically enforced, and each is local
 # by nature rather than by convenience:
 #
-#   * they validate THIS repository's own files (a generated CLAUDE.md, this repo's docs),
-#     so there is no shared logic to donate upstream — a template job would need every
-#     path and file name passed in as a variable to say anything at all;
-#   * they need nothing but bash, coreutils and git, so the usual reason to centralise
+#   * they validate THIS repository's own files (a generated CLAUDE.md, this repo's docs,
+#     the scaffold charts under templates/ that only the standard repo has), so there is
+#     no shared logic to donate upstream — a template job would need every path and file
+#     name passed in as a variable to say anything at all;
+#   * two of the three need nothing but bash, coreutils and git, and the third reuses a
+#     tool image the shared SAST templates already pin, so the usual reason to centralise
 #     (pinned tool images, registry credentials, cache tuning) does not apply;
 #   * the shared templates repo is off-limits for this change, and a rule that CLAUDE.md
 #     advertises as enforced while nothing runs it is worse than no rule: it teaches every
@@ -200,3 +202,53 @@ doc-sync:
         exit 1
       fi
       echo "doc-sync OK"
+
+# Scaffold-chart scan (PRJ-35) — the GitLab twin of the `Scaffold charts` job in
+# .github/workflows/ci.yml. Keep the two in step: both run the same script in the same pinned
+# image, so a finding cannot be red on one host and green on the other.
+#
+# WHY THIS IS NOT COVERED BY THE SHARED SAST JOB. `checkov -d .` cannot render a chart whose
+# placeholders are still in place — the rendered manifest starts a plain scalar with `@`, which
+# is a reserved YAML indicator — so it logs
+#
+#   [WARNI] Failed processing helm chart @@PROJECT@@ at dir: ./templates/service/helm
+#
+# and SKIPS THE CHART while the run stays green. The same run then reports
+# `helm scan results: Passed checks: 84` for the repo's own helm/ chart, which reads exactly
+# like coverage of both. The chart every service repo in the group is scaffolded from was
+# therefore never scanned by the gate whose purpose is scanning charts.
+#
+# The script substitutes a throwaway copy first, renders that, and scans the result — and
+# fails on every way this could quietly become a no-op again: zero charts discovered, a
+# placeholder with no value, a render error (fatal, never a warning), zero resources parsed,
+# or any failed check. See its header for the reasoning, including why it runs only checkov's
+# `kubernetes` framework.
+scaffold-chart-scan:
+  stage: sast
+  # ${CHECKOV_IMAGE} is already pinned by the shared globals.yml (bridgecrew/checkov:3.3.1)
+  # and already used by the shared SAST job, so this adds no new pin to maintain — and the
+  # chart is scanned by the same checkov build that scans everything else. The image ships
+  # helm as well, because checkov's own helm framework needs it.
+  image:
+    name: ${CHECKOV_IMAGE}
+    entrypoint: [""]
+  extends:
+    - .default_runner
+  # Independent of every other job: nothing it reads is produced by the pipeline.
+  needs: []
+  rules:
+    # No branch pipeline while an MR is open for that branch — the MR pipeline covers the
+    # same commit, and without this guard every push runs the gate twice.
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"
+      when: never
+    - if: $CI_COMMIT_TAG
+      when: always
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: always
+    - if: $CI_COMMIT_BRANCH
+      when: always
+  # No allow_failure and no retry. A gate that cannot fail the build is not a gate, and every
+  # failure this job can produce is a finding rather than an infrastructure fault — retrying a
+  # script_failure is allow_failure wearing a different hat.
+  script:
+    - ./auto-tests/group-a/scan-scaffold-charts.bash

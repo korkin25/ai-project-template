@@ -15,6 +15,10 @@
 #   helm        lint + template always, package + OCI push to GHCR on tags
 #   functional  runs the repository's own auto-tests/group-a/*.sh scripts
 #
+# One job is NOT from open-ci-actions — `scaffold-charts`. It scans the chart scaffolds under
+# templates/, which only the standard repo has, so there is nothing to donate upstream. Its
+# rationale is at the job itself.
+#
 # Publishing is a SEPARATE workflow (`release.yml`): NO tags — a merge to the
 # `release` branch publishes the GitVersion number to PyPI via Trusted Publishing.
 #
@@ -125,6 +129,44 @@ jobs:
       bandit-target: ${{ needs.detect.outputs.python-package-dir }}
       dockerfile: deploy/Dockerfile
       semgrep-configs: p/security-audit p/secrets
+
+  # ---------------------------------------------------------------------------
+  # 4b. The chart scaffolds under templates/ — repo-local, and the one job here that
+  # is not a shared reusable workflow.
+  #
+  # WHY THE SHARED `sast` JOB DOES NOT COVER THEM. checkov cannot render a chart whose
+  # placeholders are still in place: the rendered manifest starts a plain scalar with
+  # `@`, a reserved YAML indicator, so checkov logs
+  #
+  #   [WARNI] Failed processing helm chart @@PROJECT@@ at dir: ./templates/service/helm
+  #
+  # and SKIPS THE CHART while the run stays green. The same run reports
+  # `helm scan results: Passed checks: 84` for the repo's own helm/ chart, which reads
+  # exactly like coverage of both — so the chart every service repo in the group is
+  # scaffolded from was never scanned by the gate whose purpose is scanning charts.
+  #
+  # The script substitutes a throwaway copy, renders it, and scans the result, failing on
+  # every way this could quietly become a no-op again: zero charts discovered, a
+  # placeholder with no value, a render error (fatal, never a warning), zero resources
+  # parsed, or any failed check. Its header carries the reasoning, including why it runs
+  # only checkov's `kubernetes` framework.
+  #
+  # Run in the same pinned image the GitLab twin uses (`bridgecrew/checkov:3.3.1`, which
+  # ships helm too) rather than against tools preinstalled on the runner: this repo lives
+  # on both hosts as identical copies, and a gate whose tool versions differ per host is a
+  # gate that can be green on one and red on the other.
+  # ---------------------------------------------------------------------------
+  scaffold-charts:
+    name: Scaffold charts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Render and scan every chart under templates/
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/repo:ro" -w /repo \
+            --entrypoint /repo/auto-tests/group-a/scan-scaffold-charts.bash \
+            bridgecrew/checkov:3.3.1
 
   # ---------------------------------------------------------------------------
   # 5. Container image. Builds on every ref, publishes only from the release
