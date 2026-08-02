@@ -1,7 +1,7 @@
 <!-- GENERATED FILE — DO NOT EDIT.
      Sources : standard/base.md + standard/profiles/service.md + standard/repo.env
      Profile : service
-     Sources-SHA256: aa2133458387268b84aac3a54c7eab8e418bc6c782c671417949b5e440e67ca8
+     Sources-SHA256: 2f26615be7612939ad31d76d2bbe2239e1da3dee0baa2989880ed97ceefa335b
      Regenerate: ./standard/compose.sh
      Edit the sources, never this file. CI fails a change where the two disagree.
 -->
@@ -957,6 +957,117 @@ Two rules follow. **Prefer satisfying the check to waiving it** — the two abov
 rather than skipped, and the passing count went *up*, which is the outcome to aim for. And
 **when the thing a waiver describes disappears, the waiver goes with it**: a skip whose subject
 no longer exists is how a skip list rots into a list nobody dares touch.
+
+## Configuration reaches a service through its chart, never through a default in code
+
+**A service's configuration is declared in its Helm values, rendered into that service's own
+ConfigMap, and consumed with `envFrom`.** Not from defaults compiled into the application, not
+from one shared ConfigMap that every service reads, and not from a variable somebody remembered
+to set.
+
+The shape has four parts and each one is load-bearing.
+
+### 1. `appConfig:` in values — nested, mirroring the application's own structure
+
+```yaml
+appConfig:
+  postgres:
+    host: db-rw.platform.svc
+    port: "5432"
+  qdrant:
+    host: qdrant.platform.svc
+```
+
+Nested rather than flat because that is how the application already thinks about its settings,
+and a values file that mirrors the application is one a reader can check against it.
+
+### 2. The chart flattens it into a ConfigMap — generated, never enumerated
+
+A recursive helper turns the nested map into flat keys joined by a delimiter, and the ConfigMap
+template renders whatever it finds:
+
+```yaml
+{{- if .Values.appConfig }}
+data:
+  {{- include "application.flattenConfig" (list "" .Values.appConfig) | nindent 2 }}
+{{- end }}
+```
+
+`__` is the usual delimiter because both .NET and pydantic-settings read nested configuration
+that way, so the same flattening serves either without a translation step.
+
+### 3. The deployment names the **source**, never the keys
+
+```yaml
+envFrom:
+  - configMapRef:
+      name: {{ $cfgName }}
+      optional: true
+  - secretRef:
+      name: {{ $secName }}
+      optional: true
+```
+
+**This is the part that decides whether the pattern survives.** The moment a deployment template
+enumerates individual keys, adding one setting means editing the chart, and the chart and the
+values drift apart silently — the values file grows a key that nothing reads, and nobody finds
+out until the behaviour it was meant to change fails to change. Name the source; let the
+ConfigMap carry whatever it carries.
+
+### 4. Three layers, and which layer a key belongs in is not a matter of taste
+
+| Layer | Source | Applies to |
+|---|---|---|
+| **Environment globals** | the bundle itself, injected as `global.*` at render | every chart in the environment |
+| **`values/common.yaml`** | the environment's values directory | every service in that environment |
+| **`values/<service>.yaml`** | one file per service | that service, overriding common |
+
+Globals come from the bundle rather than from a values file **so that an environment cannot
+disagree with itself** — the namespace, the registry and the secret-store prefix are properties
+of the environment, and there is exactly one place to state them.
+
+The test for the other two: **would two services ever want different values for this key?** If
+no, it is common, and copying it into each service's file is how they eventually drift. A
+per-service file must still be able to override a common key — one service will legitimately
+need a read replica or a separate schema — so the merge order is stated explicitly, not guessed.
+
+### What this replaces, and why the replaced thing is dangerous rather than merely untidy
+
+**Defaults in application code for anything environment-shaped.** A field declared as
+
+```python
+postgres_host: str = "localhost"
+postgres_password: str = "jobagent"
+```
+
+does not fail when its key is missing. It connects somewhere else, with a default credential,
+and reports itself healthy. That is a check that exists and cannot fail — the same disease as a
+soft-failing CI gate, and it is worse here because the blast radius is a database.
+
+**A missing configuration key must crash the service at startup, naming the key.** That error is
+the entire benefit of removing the default; everything else is moving numbers between files.
+
+Keep the typed declaration — field names, types, required-ness — because that is what makes a
+bad value fail at startup instead of at first use, and what stops the values file and the code
+drifting apart. Remove only the values.
+
+**A default is still legitimate for a code-level choice** — a retry count, a backoff multiplier,
+a batch size. The test is not "does this vary between environments" but **"would a wrong value
+here be a deployment mistake or a code decision?"** If it is a deployment mistake, the default
+must be absent.
+
+### One more thing this buys, which is easy to miss until it bites
+
+Kubernetes injects `<SERVICE_NAME>_PORT=tcp://<ip>:<port>` into every pod in a namespace, for
+every service in it. A field named after a service — `qdrant_port` reading `QDRANT_PORT` — is
+therefore **already taken**, and gets a URL where it expected a number. The application fails
+before its own first line runs, with an error naming the wrong culprit.
+
+An explicit `envFrom` ConfigMap **overrides** the injected variable by construction. So this
+pattern removes that whole class of collision as a side effect — but only when the ConfigMap
+carries the key. Relying on it accidentally, as a shared ConfigMap that happens to have the
+right entry, means the next service without it crashes on a message that sends its author to
+the wrong system entirely.
 
 ## Versioning & releasing (auto-generated — never hardcode)
 
