@@ -9,6 +9,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`Three events always get an entry`** (`PRJ-37`) — a register movement, a problem found and a
+  decision taken are recorded in `AUTOPILOT-LOG.md` every time, committed and pushed as written.
+  This does not contradict *Small steps are the protection — not a running journal*, and the
+  boundary is what keeps them apart: **a code change is legible from its own diff and these three
+  are not.** A row moving `TODO.md` → `CHANGELOG.md` shows as two edits in opposite directions
+  and says nothing about *what verified it* — "done" is a claim, the command that proved it is the
+  record. A problem found and not fixed leaves **no trace at all**, so it is re-found at full cost
+  by whoever trips over it next, who will not know it was already understood. A decision shows its
+  consequence one option deep and never *what was rejected*, so it reads as the only thing anyone
+  thought of and is re-litigated by the first person who has the rejected idea.<br><br>The payoff
+  is that a cold session asks three questions, not one — what was planned, what was done, and what
+  was started and left undone. `TODO.md` answers the first, `CHANGELOG.md` the second, and nothing
+  but this file answers the third, which is the one that decides what to do next.
 - **`Starting a session`** (`PRJ-36`) — the resume point is read **before the first action of
   every session**, not only "after a break". The older wording was conditional on the agent
   recognising that it was resuming, and no agent does: every session feels like a fresh start

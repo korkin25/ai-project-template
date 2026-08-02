@@ -4,6 +4,36 @@ Autonomous changes (user authorized publishing this repo + full autopilot on the
 
 Entries are **newest first**, in the format this repo's own standard mandates.
 
+## 2026-08-03 — the three events that no diff can show (`PRJ-37`)
+
+**What changed.** `standard/base.md` gained `### Three events always get an entry — they are the
+ones no diff can show` under *Autopilot log*: a register movement (`TODO.md` → `CHANGELOG.md`), a
+problem found, and a decision taken each get an entry, committed and pushed as written.
+`CLAUDE.md` regenerated.
+
+**Why.** User request. The rule had to be written so it does **not** contradict *Small steps are
+the protection — not a running journal* three paragraphs above, and the boundary that separates
+them is the whole argument: a code change is legible from its own diff, and these three are not.
+A row moving between registers shows as two edits in opposite directions and says nothing about
+what verified it. A finding that was not fixed leaves **no trace at all**. A decision shows its
+consequence one option deep and never what was rejected. Reconstructing any of the three means
+reading every commit and guessing at intent — the archaeology this file exists to prevent.
+
+**State.** Branch `feature/PRJ-1-multi-repo-standard`, pushed. Nothing local-only.
+
+**Verified by.** `./standard/compose.sh --check` → `OK: CLAUDE.md matches standard/
+(profile=service)`, exit 0.
+
+**Reverse.** Revert this commit and re-run `compose.sh`; the subsection is self-contained.
+
+**Open.** The job-agent half of the request is a separate commit in `job-agent/platform/docs`,
+since that repository vendors the standard rather than editing it. Two audit findings from
+2026-08-03 remain open and untouched, both needing the user: the CPU-limit sentence contradicts
+`CKV_K8S_11`, which is not in `.checkov.yaml`'s skip list and fails a chart without a CPU limit
+(measured 84/0 with, 83/1 without); and the new configuration rule contradicts
+`profiles/service.md` plus the service scaffold, which implements the banned side.
+
+
 ## 2026-08-03 — orient before acting, work the plan, and push the record (`PRJ-36`)
 
 **What changed.** `standard/base.md` gained `## Starting a session` between the context map and

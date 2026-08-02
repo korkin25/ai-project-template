@@ -1368,6 +1368,32 @@ is which is what lets the next session resume rather than re-derive.
 Write an entry for any autonomous change of substance: a feature, a refactor, a CI change, a
 decision taken, or a blocker discovered. Trivial typo fixes do not need one.
 
+### Three events always get an entry — they are the ones no diff can show
+
+The rule above says *do not journal continuously*, and this one names what is not optional
+anyway. There is no tension between them, and the boundary is precise: **a code change is
+legible from its own diff, and these three are not.** Reconstructing them from history means
+reading every commit and guessing at intent, which is the archaeology this file exists to
+prevent.
+
+| Event | What the diff shows | What only the entry can say |
+|---|---|---|
+| **A row moves `TODO.md` → `CHANGELOG.md`** | two edits, in opposite directions | **what verified it.** "Done" is a claim; the command that proved it, and its result, is the record. A row that moved because somebody believed it was finished is indistinguishable in the diff from one that moved because a test passed. |
+| **A problem found** | usually *nothing* — a finding that was not fixed leaves no trace at all | that it exists, where the evidence is, and whether it was left deliberately. An unrecorded finding is re-found at full cost by whoever trips over it next, and they will not know it was already understood. |
+| **A decision taken** | its consequence, one option deep | **what was rejected and why.** Without that, the decision reads as the only thing anyone thought of, and gets re-litigated by the first person who has the rejected idea. |
+
+Each entry is committed **and pushed** as it is written — see *Commit and push documentation
+often*. An entry that only exists locally documents nothing.
+
+**The payoff is the question a cold session actually asks**, and it is three questions rather
+than one: *what was planned*, *what was done*, *what was started and left undone*. `TODO.md`
+answers the first, `CHANGELOG.md` the second, and **nothing but this file answers the third** —
+which is the one that decides what to do next, and the one that is lost by default.
+
+Keep them short. This is not a second changelog: the entry says what moved, what proved it, what
+was rejected, and where the seam is. If it needs more than that, the material belongs in the
+ticket or the decision record, and the entry points there.
+
 Format — newest first, one `##` section per working session:
 
 ```markdown
