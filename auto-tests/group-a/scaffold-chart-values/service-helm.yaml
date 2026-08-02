@@ -1,0 +1,39 @@
+# Scan-only values for templates/service/helm, used by the "all-features" pass of
+# ../scan-scaffold-charts.bash. Discovered by the chart's path slug (templates/service/helm ->
+# service-helm.yaml); a chart with no file here is scanned on its defaults alone.
+#
+# WHY THIS FILE EXISTS. Four of the service chart's templates are behind `enabled: false` in
+# helm/values.yaml, for good reasons that all belong to a real deployment: an HTTPRoute needs a
+# Gateway the infra repo owns, a ServiceMonitor needs a CRD that is a cluster prerequisite, a
+# PodDisruptionBudget only makes sense above one replica. The consequence for THIS repository
+# is that on defaults nothing ever renders them — not `helm lint`, not the shared chart job
+# (which points at helm/, the repo's own chart), not checkov. Half the scaffold chart would be
+# shipped to twelve repositories having never been parsed by anything.
+#
+# These are NOT recommended values and nothing deploys them. They are the smallest set that
+# turns every optional template on while satisfying the chart's own `fail` guards:
+# httpRoute needs parentRefs and service.enabled, serviceMonitor needs service.enabled, and
+# podDisruptionBudget.minAvailable must stay below replicaCount.
+replicaCount: 2
+
+serviceMonitor:
+  enabled: true
+  labels:
+    release: kube-prometheus-stack
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+httpRoute:
+  enabled: true
+  parentRefs:
+    - name: platform-gateway
+      namespace: gateway-system
+      sectionName: https
+  hostnames:
+    - scan.example.com
+
+# Exercises the `range .Values.env` block, which renders nothing on defaults.
+env:
+  LOG_LEVEL: INFO

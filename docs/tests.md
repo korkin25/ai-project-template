@@ -42,6 +42,27 @@ moved.
 | `tests/test_app.py::test_server_serves_health` | (a) | server answers `GET /health` 200 | ✅ |
 | CI `functional` job boots the image, probes `/health` | (a) | container serves | ✅ |
 
+## Feature 2 — The scaffold Helm charts are scanned (`PRJ-35`)
+
+`auto-tests/group-a/scan-scaffold-charts.bash` substitutes a throwaway copy of every chart
+under `templates/`, renders it, and scans the rendered manifests with checkov. Run by
+`scaffold-chart-scan` (GitLab) and `Scaffold charts` (GitHub), both in
+`bridgecrew/checkov:3.3.1`, which ships helm as well.
+
+**The negative tests are the point of the feature, not a formality.** The defect being fixed is
+not "the chart is unscanned" — it is "the chart is unscanned *and the run is green*". A test
+plan that only proves the passing direction would reproduce exactly that.
+
+| Test | Group | What it asserts | Status |
+|------|-------|-----------------|--------|
+| `scan-scaffold-charts.bash` on the repo as-is | (a) | every discovered chart renders and scans clean; prints the resource count (11 across two value sets, 168 checks passed) | ✅ |
+| …with the chart directory removed | (a) | zero charts discovered is a **failure**, not a quiet pass — the guard against the check itself becoming a no-op | ✅ |
+| …with an `@@…@@` token no value is known for | (a) | fails with the leftover token named, the same hard stop `standard/compose.sh` performs | ✅ |
+| …with a template that renders invalid YAML | (a) | `helm template` failing is **fatal**, never a warning — the exact downgrade that caused the defect | ✅ |
+| …with a resource that violates a hardening check | (a) | any failed check turns the gate red (14 findings on a `Job` with no securityContext, no resources) | ✅ |
+| …with a chart whose kinds checkov does not recognise | (a) | `resource_count == 0` fails, even though checkov itself exits 0 with `passed=0 failed=0` | ✅ |
+| The same script inside `bridgecrew/checkov:3.3.1` | (a) | the CI image produces byte-identical results to a developer machine, so the two hosts cannot disagree | ✅ |
+
 <!-- Template — copy per new feature:
 
 ## Feature <n> — <title>
