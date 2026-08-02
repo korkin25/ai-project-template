@@ -4,6 +4,43 @@ Autonomous changes (user authorized publishing this repo + full autopilot on the
 
 Entries are **newest first**, in the format this repo's own standard mandates.
 
+## 2026-08-03 — orient before acting, work the plan, and push the record (`PRJ-36`)
+
+**What changed.** `standard/base.md` gained `## Starting a session` between the context map and
+*Changing the rules*, and the context map's first two rows were rewritten to point at it.
+`CLAUDE.md` regenerated (`compose.sh --check` exits 0). Four rules, from the user:
+
+1. The resume point — `AUTOPILOT-LOG.md`, `TODO.md`, `questions.md`, in that order — is read
+   **before the first action of every session**, not only "after a break".
+2. Once oriented, the default action is the plan, not a question to the user.
+3. The status feed is journalled locally, because it cannot be read back.
+4. Documentation is committed **and pushed** as it is written; `AUTOPILOT-LOG.md` per entry.
+
+**Why.** The old wording was conditional on the agent recognising that it was resuming, and no
+agent does — every session feels like a fresh start from the inside, so a rule requiring that
+judgement never fires. On (3): the Telegram Bot API has no method returning a bot's own sent
+messages and `getUpdates` carries only *incoming* updates within a short retention window;
+measured against `coder_korkin25_bot` immediately after it posted, `getUpdates` returned `[]`.
+That is why the recall is a local journal rather than a read scope — and it keeps *cannot read
+at all* a real property of the feed bot, which `JAP-D28` in job-agent relies on. On (4): this
+very file had **no entry for the fifteen commits** between 2026-07-27 and 2026-08-02.
+
+**State.** Branch `feature/PRJ-1-multi-repo-standard`, pushed. Nothing local-only.
+
+**Verified by.** `./standard/compose.sh --check` → `OK: CLAUDE.md matches standard/
+(profile=service)`, exit 0. The `getUpdates` measurement is quoted above rather than inferred
+from documentation.
+
+**Reverse.** Revert the two commits and re-run `compose.sh`; the section is self-contained and
+nothing else references it.
+
+**Open.** `PRJ-36` claimed `PRJ-35` first and collided with the scaffold-chart-scan work, which
+had a `TODO.md` row and an entry in this file already; renumbered here rather than there because
+it was one reference against six. The audit that ran the same day found rules whose gates
+disagree with them — a CPU-limit sentence against `CKV_K8S_11`, a configuration rule against
+`profiles/service.md` — both awaiting the user's decision and neither touched.
+
+
 ## 2026-08-03 — the scaffold Helm chart was never scanned, and the run stayed green (`PRJ-35`)
 
 **What changed.** New tier-(a) gate `auto-tests/group-a/scan-scaffold-charts.bash`, an optional

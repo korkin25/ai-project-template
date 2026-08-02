@@ -9,7 +9,7 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- **`Starting a session`** (`PRJ-35`) — the resume point is read **before the first action of
+- **`Starting a session`** (`PRJ-36`) — the resume point is read **before the first action of
   every session**, not only "after a break". The older wording was conditional on the agent
   recognising that it was resuming, and no agent does: every session feels like a fresh start
   from the inside, so a rule that asks for that judgement never fires. `AUTOPILOT-LOG.md`,
@@ -24,11 +24,17 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   project that wants that history appends to its own journal at send time, which is greppable,
   survives a lost session, and opens no injection path.
 - **Documentation is committed and pushed as it is written**, not batched to the end of a task.
-  A complete `AUTOPILOT-LOG.md` sitting uncommitted is worth nothing to the next agent, to a
-  parallel agent, or to the same agent after a crash — and worth less than nothing to a reader
-  who finds the branch and concludes nothing happened. A status change is a push; docs are not
-  gated on the feature being green; and where several agents share a repository, a pushed
-  `TODO.md` row is what stops two of them starting the same work.
+  **A documentation commit is followed by a push in the same breath — always, no exceptions and
+  no judgement call.** An unpushed commit is invisible to every process that matters (another
+  agent's `git pull`, a reviewer opening the branch, the next session after a crash) and
+  invisible in the most expensive way, because `git log` in your own tree shows it and reads as
+  done. `AUTOPILOT-LOG.md` is named separately: it is committed and pushed **as each entry is
+  written**, because a resume point that exists only locally has failed at the one job it has,
+  in exactly the case it was written for. Measured on this branch: fifteen substantive commits
+  over five days — six new rules, a CVE removal and a diagnosed blocker — with **not one**
+  `AUTOPILOT-LOG.md` entry among them. A status change is a push; docs are not gated on the
+  feature being green; and where several agents share a repository, a pushed `TODO.md` row is
+  what stops two of them starting the same work.
 - **Hardening has two test surfaces, and only the cheap one gets tested** (`PRJ-33`). A
   container that *starts* under a restriction has not been shown to *work* under it: startup is
   one code path exercised in seconds, operation is every path the workload takes afterwards.

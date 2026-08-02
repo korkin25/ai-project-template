@@ -1,7 +1,7 @@
 <!-- GENERATED FILE — DO NOT EDIT.
      Sources : standard/base.md + standard/profiles/service.md + standard/repo.env
      Profile : service
-     Sources-SHA256: 8db2be429381996f30566f30e6636901f4cb601ae74e441710c3c6cf248a06e7
+     Sources-SHA256: a994b602bf72c157aeb37445074ec6d8a969f251f9d98790d576a631ec01b1ab
      Regenerate: ./standard/compose.sh
      Edit the sources, never this file. CI fails a change where the two disagree.
 -->
@@ -103,8 +103,23 @@ Everything above only works if the files are **reachable by someone who is not y
 a parallel agent, or to you after a crash — and it is worth less than nothing to a reader who
 finds the branch and concludes that nothing happened.
 
-So documentation is committed and pushed **as it is written**, not batched to the end of a task:
+So documentation is committed and pushed **as it is written**, not batched to the end of a task.
 
+**A documentation commit is followed by a push, in the same breath. Always, with no
+exceptions and no judgement call.** Not "when the branch is tidy", not "with the next code
+commit", not "before I stop". A commit that is not pushed is invisible to every process that
+matters here — another agent's `git pull`, a reviewer opening the branch, the next session
+after a crash — and it is invisible in the most expensive way, because `git log` in *your*
+working tree shows it and reads as done. That is not a slower version of pushing; it is a
+different outcome that looks identical from the inside.
+
+- **`AUTOPILOT-LOG.md` is committed and pushed as each entry is written**, not at the end of a
+  session and not "once the work settles". This one is named separately because it is the file
+  whose entire purpose is surviving a session that ends without warning — a resume point that
+  only exists locally has failed at the one job it has, and it fails precisely in the case it
+  was written for. Write the entry when the step lands, commit it, push it. Measured here: a
+  branch took fifteen substantive commits over five days — six new rules, a CVE removal and a
+  diagnosed blocker — with **not one** `AUTOPILOT-LOG.md` entry among them.
 - **A status change is a push.** Starting a row, blocking one, finishing one — that is the
   moment the record is worth something to somebody else, and the moment it is cheapest to write.
 - **Docs need not wait for the code to be green.** They are not gated on the feature working;
