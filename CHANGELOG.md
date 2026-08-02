@@ -9,6 +9,54 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Distributed tracing — optional, and "optional" is load-bearing** (`JAP-STD-1`, the platform
+  id from the project that requested it; `99d4465`). `standard/base.md` gains the rule under
+  *Observability*, which until now covered metrics, structured logs and the dashboard and said
+  nothing about traces — the one signal that answers *which of the six services made this
+  request slow*, which neither of the other two can.
+
+  **The word "optional" had to be made to mean something**, because a rule that says "add
+  tracing" without saying when it is *not* required produces either universal instrumentation
+  nobody reads or universal quiet non-compliance. So the rule **binds a repo only once its
+  platform declares a trace backend in `requirements.yaml`**; where none is declared, emitting
+  spans is not non-compliance and adding them is not an improvement. And stated in the same
+  breath so "optional" cannot decay into "never": once a backend exists, tracing stops being
+  optional for request paths that cross a service boundary. The opt-in is a platform decision,
+  not a per-feature one.
+
+  The shape: emission is **vendor-neutral — OpenTelemetry over OTLP**, instrumented in the
+  shared library exactly as the log schema is, so no service invents its own span names or
+  propagation and no service ever imports a backend's SDK. Context propagates over W3C
+  `traceparent` on HTTP and in message headers on the bus. The **backend is a project
+  decision**, recorded in that project's `docs/architecture.md` and never in the standard —
+  **Tempo** is the usual pairing where Grafana is already the dashboard, because it shares the
+  label vocabulary, and it is *job-agent's* choice, not the standard's. Sampling rate is
+  written down, because nobody can tell a missing trace from a dropped one otherwise.
+
+  **The payoff written down is correlation, not traces.** The trace id must appear as a **log
+  field**, so a slow request in a dashboard leads to its spans *and* its log lines without
+  anyone copying identifiers by hand. That makes this an addition to the *structured logging*
+  rule rather than a separate silo.
+
+  `templates/platform/requirements.yaml` gains an `observability` group carrying
+  `metrics-backend` and `log-backend` at `required: true` and **`trace-backend` at
+  `required: false`** — stated as *"OTLP-compatible trace store, correlatable with logs by
+  trace id"*, a capability rather than a product, so any compliant store satisfies it.
+
+  **And `check-requirements.py` had to be taught to read the new group** — the finding worth
+  keeping. It iterated a fixed list of keys, so the observability entries would have been
+  **parsed by nobody**: the file would declare them, the checker would never look, and a
+  requirement that can never be reported missing is indistinguishable from one nobody wrote.
+  They report `UNVERIFIED` rather than passing, for the same reason `dataServices` does — a
+  check that looked for a Deployment named `prometheus` would pass on the wrong thing and fail
+  on VictoriaMetrics, which is worse than admitting it cannot tell. Verified against a live
+  cluster: the script prints the new `observability` group with all three entries and their
+  required/optional flags.
+
+  Propagation to every repo carrying a generated `CLAUDE.md` is the same obligation as any
+  other rule change and is tracked separately (`JAP-STD-3`); this repo's own `CLAUDE.md` is
+  regenerated in the same commit.
+
 - **Hardening has two test surfaces, and only the cheap one gets tested** (`PRJ-33`). A
   container that *starts* under a restriction has not been shown to *work* under it: startup is
   one code path exercised in seconds, operation is every path the workload takes afterwards.
@@ -140,6 +188,44 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   already asserts the same invariant one level up.
 
 ### Fixed
+
+- **What checkov and hadolint actually failed on, fixed at the source rather than waived**
+  (`JAP-CI-7`, the platform id from the project that requested it; `669120d`, `d32afa4`). The
+  instruction was explicitly ordered — *run the scanners locally first and fix what they say,
+  then re-run the pipeline to prove it* — and the order is the point: a pipeline re-run is a
+  ten-minute feedback loop and the scanners are a two-second one, so iterating in CI would have
+  burned an afternoon to learn what `checkov -d .` says immediately. **The re-run is the proof,
+  not the debugging tool.**
+
+  - **hadolint `DL3013`** — `deploy/Dockerfile` now pins `pip` and `build` rather than
+    installing them unversioned.
+  - **checkov `CKV_SECRET_6`** fired on `imagePullSecret: gitlab-registry` — *the name of a
+    Secret*, not a secret. Fixed by making it the placeholder **`<image-pull-secret>`**, which
+    was independently correct and is the better reason to have changed it: the literal
+    hardcoded one CI host into a scaffold the standard requires to be **host-agnostic**.
+    `validate-bundles.py` gained a cross-field check in the same change, because that name is
+    declared twice — in `bundle.yaml` for Flux to fetch the chart, and in `values/common.yaml`
+    for the kubelet to fetch the image — and nothing noticed when the two drifted. Proven by a
+    negative test: desynchronise them deliberately and it exits 1 naming both values.
+  - **The seven chart findings** got a root `.checkov.yaml`, ported from the scaffold that
+    already had one — without it the reference implementation failed a gate its own scaffold
+    passes. Every skip carries the reason **it cannot be satisfied by a template**, because a
+    skip list copied without re-reading why is how a real finding gets buried beside six
+    legitimate ones.
+
+  **Verified locally, which is the half that actually ran:** hadolint v2.14.0 silent on
+  `deploy/Dockerfile` (exit 0; the scaffold's `SC2086` is *info*, below the `warning`
+  threshold), `checkov -d .` **0 failed** across the repository, the image builds, its
+  `HEALTHCHECK` reaches healthy, and the smoke test passes end to end.
+
+  **The pipeline half did not prove anything, and that is recorded rather than glossed.** The
+  re-run that was supposed to be the proof — pipeline `2707081937` on this repo, and
+  `2706980907` on `job-agent/infra/dev-stack` — reported `success` while running **no SAST jobs
+  at all**: both scanners are gated on `$CI_COMMIT_BRANCH =~ /(dev|main|master|prod.*)/` plus
+  `changes:`, so a feature branch never creates them. **A green pipeline that ran nothing is
+  worse than a red one**, and this row is where that was found. It is tracked as `JAP-CI-10` in
+  the requesting project's register and is still open, so the scanner evidence above rests on
+  the local runs and on nothing else.
 
 - **The service Dockerfile invalidated its dependency layer on every commit** (`PRJ-34`). It
   copied `src/` and then ran one `pip install .`, so the layer holding every dependency was
