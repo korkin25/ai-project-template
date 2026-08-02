@@ -1,7 +1,7 @@
 <!-- GENERATED FILE — DO NOT EDIT.
      Sources : standard/base.md + standard/profiles/service.md + standard/repo.env
      Profile : service
-     Sources-SHA256: 16fa8d83ba39fc39ea9a65515c3f8965ade94c49782050db5befdf057616bfcb
+     Sources-SHA256: aa2133458387268b84aac3a54c7eab8e418bc6c782c671417949b5e440e67ca8
      Regenerate: ./standard/compose.sh
      Edit the sources, never this file. CI fails a change where the two disagree.
 -->
@@ -1291,6 +1291,57 @@ A reporting rule that depends on an agent remembering produces silence exactly w
 gets interesting — a long autonomous run is when the feed matters most and when the rule is
 most likely to slip. Wire it into the per-turn reminder the same way the context map is wired,
 so it survives compaction and a change of agent.
+
+## A public repository never names a private one
+
+**Nothing written into a public project — a commit message, an MR title or description, a code
+comment, a changelog entry, an issue — may name an internal or closed project, its repositories,
+its tickets, its pipeline and job ids, its hosts, or its people.** This binds every artefact that
+ships with the repository, not merely the ones that feel like documentation.
+
+The reason is not secrecy theatre. A shared template, an open library, a published action is read
+by people who have no access to the thing being cited, and for them the reference is:
+
+- **unverifiable** — they cannot open `job-agent/services/matching` or pipeline `2724616191`, so a
+  justification resting on it is something they must take on faith;
+- **an information leak** — repository names, ticket prefixes, job ids and host names disclose the
+  shape of a private estate, and they accumulate. Any single mention looks harmless; the set of
+  them is a map;
+- **a promise to keep something in step that nobody will** — the private repo gets refactored,
+  renamed or deleted, and the public comment now cites something that does not exist. Nobody
+  outside can even tell it went stale.
+
+### Write the shape, not the instance
+
+The justification is almost always durable and the citation almost never is. *"A child pipeline
+that creates no pipeline fails the parent's trigger job under `strategy: depend`"* is a property
+of the CI system and will be true in five years. *"`someorg/some-service` triggers two children"*
+is a fact about somebody's backlog that will not survive their next refactor. **Keep the first,
+drop the second** — and notice that doing so usually makes the comment *better*, because it states
+the rule instead of an example of it.
+
+Where a measurement genuinely carries the argument, keep the measurement and drop the identity:
+*"the bucket held 3.4 GB across ten projects within 13 hours"* says everything *"`services/api` at
+306 MB"* does, and says it to everyone.
+
+### What stays
+
+- **Facts about the tools themselves** — a deprecated configuration value, an exit code, an API's
+  behaviour. Those belong to the vendor, not to any project.
+- **Functional references**: an image the pipeline actually pulls, a package it depends on, a
+  registry it authenticates to. Those are not mentions, they are the code.
+- **The private side may cite the public side freely.** The asymmetry is the whole point.
+
+### It applies to what is already there
+
+A rule that only binds new commits leaves the existing mentions in place, and those are the ones
+that have had time to go stale. When touching a file that names a private project, de-name it in
+the same change — including where the mention predates this rule and was written by whoever is
+now removing it.
+
+The test before pushing to anything public: **would this line still make sense, and still be
+checkable, to a reader with no access to anything but this repository?** If it needs an
+internal lookup to mean something, it is either rewritten as a shape or it is deleted.
 
 ## Agent security working agreements (apply without being asked)
 
