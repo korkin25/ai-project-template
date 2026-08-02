@@ -1,7 +1,7 @@
 <!-- GENERATED FILE — DO NOT EDIT.
      Sources : standard/base.md + standard/profiles/service.md + standard/repo.env
      Profile : service
-     Sources-SHA256: 2f26615be7612939ad31d76d2bbe2239e1da3dee0baa2989880ed97ceefa335b
+     Sources-SHA256: 37b642b6ae63844b48a5c958f961f6589aca5bdc590c3d73d15bea99eb6c7523
      Regenerate: ./standard/compose.sh
      Edit the sources, never this file. CI fails a change where the two disagree.
 -->
@@ -978,8 +978,17 @@ appConfig:
     host: qdrant.platform.svc
 ```
 
+**This is where the configuration values themselves live.** Not a schema, not a list of keys to
+be filled in elsewhere — the actual addresses, ports, sizes and names a deployment needs. If a
+value is missing from here (or from the layers above it), the service does not start.
+
 Nested rather than flat because that is how the application already thinks about its settings,
 and a values file that mirrors the application is one a reader can check against it.
+
+Worth stating because the rule in part 3 is easy to over-generalise: *"name the source, never the
+keys"* binds the **deployment template** only. It is not a rule about writing values down — it is
+a rule about which file writes them. They are written here, in one place, and nothing downstream
+repeats them.
 
 ### 2. The chart flattens it into a ConfigMap — generated, never enumerated
 
