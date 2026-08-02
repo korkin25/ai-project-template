@@ -197,7 +197,11 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and scans the result — wired into both hosts (`scaffold-chart-scan` on GitLab, `Scaffold
   charts` on GitHub) running the same script in the same pinned `bridgecrew/checkov:3.3.1`,
   which ships helm too. Measured after the fix: **11 resources parsed, 168 checks passed, 0
-  failed**, across two value sets.
+  failed**, across two value sets — identical on a developer machine, in the container, and in
+  CI (`Scaffold charts`, run `30758222882`, green in ~6 s). The same pipeline run still shows
+  the original defect in the shared job it belongs to: `SAST / Checkov` prints the `WARNI` and
+  reports `helm scan results: Passed checks: 84` for the repo's own chart, which is why a
+  separate gate rather than a tweak to that one is the right shape.
   <br><br>
   **Restoring the scan without restoring the alarm would have fixed the symptom and left the
   defect**, so every way this can quietly become a no-op is fatal: charts are discovered by

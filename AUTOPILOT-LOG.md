@@ -4,6 +4,45 @@ Autonomous changes (user authorized publishing this repo + full autopilot on the
 
 Entries are **newest first**, in the format this repo's own standard mandates.
 
+## 2026-08-03 — `PRJ-35` verified in CI and moved to the CHANGELOG
+
+**What changed.** A register movement: the `PRJ-35` row left `TODO.md`, its `CHANGELOG.md`
+entry gained the CI measurement. This entry exists because the movement itself is the thing no
+diff can show — two edits in opposite directions that say nothing about *what verified it*.
+
+**Why.** The entry below recorded the scaffold chart scan as proven locally and in the CI image,
+with one item explicitly open: *the two CI jobs on a real pipeline run*. That item is now half
+closed and half unclosable, and both halves are the record.
+
+**Verified by.** GitHub Actions job `Scaffold charts`, run `30758222882`, **success**, read from
+`gh api /repos/korkin25/ai-project-template/actions/jobs/91524268578/logs` rather than inferred
+from the green tick:
+
+```
+-- pass: defaults --          rendered 3 resource(s)   resources=4 passed=84 failed=0
+-- pass: all-features --      rendered 6 resource(s)   resources=7 passed=84 failed=0
+OK: 1 scaffold chart(s), 2 scan(s), 11 resource(s) parsed, 168 check(s) passed, 0 failed
+```
+
+Byte-identical to the developer machine and to `docker run bridgecrew/checkov:3.3.1`, which was
+the point of pinning one image for both hosts. **The same pipeline run still shows the original
+defect**, in the job it belongs to — `SAST / Checkov` prints
+`[WARNI] Failed processing helm chart @@PROJECT@@ at dir: ./templates/service/helm` and then
+`helm scan results: Passed checks: 84` for the repo's own chart. Both facts in one run is the
+clearest statement of why a separate gate, rather than a tweak to that one, is the right shape.
+
+**Open, and it will not close here.** `scaffold-chart-scan` on GitLab is **unverified and cannot
+be verified yet**: the GitLab project does not exist (`PRJ-17`). It is committed, its syntax is
+`yamllint`-clean, it reuses `${CHECKOV_IMAGE}` and the same `rules:`/`extends:` shape as the two
+local jobs already running there — but that is an argument, not a run, and it is recorded as
+unverified rather than assumed. It becomes real on `PRJ-17`.
+
+**A finding, not fixed.** The root `checkov -d .` still warns and skips. Adding `skip-path` was
+rejected: it removes the warning, adds no coverage, and would hide the chart outright if the new
+gate were ever deleted. The warning is the honest signal that the shared job does not cover it.
+
+**Reverse.** Restore the `TODO.md` row from this commit's parent.
+
 ## 2026-08-03 — the three events that no diff can show (`PRJ-37`)
 
 **What changed.** `standard/base.md` gained `### Three events always get an entry — they are the
