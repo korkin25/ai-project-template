@@ -112,6 +112,16 @@ every consuming repo at once, on their next regeneration, as an error about a to
 never wrote. Teaching `compose.sh` a new token is therefore a prerequisite of using it in
 the rule sources, in the same change.
 
+**The scaffold tokens now have a second reader inside this repo**, and it fails the same way
+on purpose. `auto-tests/group-a/scan-scaffold-charts.bash` resolves every `@@…@@` in a chart
+under `templates/` before rendering it, so that checkov has valid YAML to scan; a token it has
+no value for stops the gate with the leftover named, exactly as `compose.sh` does. Adding a
+token to a chart therefore means teaching that script a value in the same change. Note which
+values come from where: the four identity tokens are read from `standard/repo.env`, while
+`@@REGISTRY@@` and `@@PULL_SECRET@@` are supplied by the script itself, because they are
+deliberately not `repo.env` keys (above) and a scan needs *a* representative value rather than
+*the* value.
+
 ### The generated `CLAUDE.md` format
 
 The composed file opens with a six-line HTML comment naming its sources, its profile, a

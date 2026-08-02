@@ -161,6 +161,39 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **The scaffold Helm chart was never scanned, and the run stayed green** (`PRJ-35`).
+  `checkov -d .` cannot render a chart whose placeholders are still in place, so it logged
+  `[WARNI] Failed processing helm chart @@PROJECT@@ at dir: ./templates/service/helm` and
+  **skipped the chart** while reporting `helm scan results: Passed checks: 84` for the repo's
+  own `helm/` chart — which reads exactly like coverage of both. The chart every service repo
+  in the group is scaffolded from was therefore never seen by the gate whose entire purpose is
+  scanning charts, and nothing said so. The cause is not a broken template: Helm resolves the
+  `@@PROJECT@@.*` helpers correctly, `.Chart.Name` is the literal `@@PROJECT@@`, and the
+  **rendered** manifest then contains `name: @@PROJECT@@` unquoted — `@` is a reserved YAML
+  indicator, so a plain scalar may not begin with it. `Chart.yaml` already quotes its own
+  placeholder for exactly this reason and says so in a comment.
+  <br><br>
+  A scaffold chart is not meant to be rendered before substitution, so
+  `auto-tests/group-a/scan-scaffold-charts.bash` substitutes a throwaway copy, renders that,
+  and scans the result — wired into both hosts (`scaffold-chart-scan` on GitLab, `Scaffold
+  charts` on GitHub) running the same script in the same pinned `bridgecrew/checkov:3.3.1`,
+  which ships helm too. Measured after the fix: **11 resources parsed, 168 checks passed, 0
+  failed**, across two value sets.
+  <br><br>
+  **Restoring the scan without restoring the alarm would have fixed the symptom and left the
+  defect**, so every way this can quietly become a no-op is fatal: charts are discovered by
+  searching `templates/**/Chart.yaml` rather than naming `service` literally, **zero charts
+  discovered fails**, an unknown `@@…@@` token fails (the same hard stop `compose.sh` performs),
+  a render error fails *instead of warning*, and **a scan reporting zero parsed resources
+  fails** — because "checkov ran and found nothing" and "checkov parsed nothing" both print
+  `failed=0` and exit 0, and that equivalence is the whole bug. Reproducing it one level up
+  would have been the joke writing itself. The check runs checkov's `kubernetes` framework and
+  no other, deliberately: on a rendered fixture every string an entropy detector could flag is
+  one this script invented, and `CKV_SECRET_6` cannot tell a Kubernetes Secret's *name* from
+  its payload — while the repository's real files stay covered by the SAST job's full-framework
+  `checkov -d .` and by gitleaks. A second value set (`auto-tests/group-a/scaffold-chart-values/`)
+  renders the four templates that sit behind `enabled: false`, because on defaults alone half
+  the chart is parsed by nothing in this repository.
 - **The service Dockerfile invalidated its dependency layer on every commit** (`PRJ-34`). It
   copied `src/` and then ran one `pip install .`, so the layer holding every dependency was
   keyed on the source — and no registry layer cache could help, because that key changed with

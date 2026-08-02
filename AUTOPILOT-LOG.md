@@ -4,6 +4,79 @@ Autonomous changes (user authorized publishing this repo + full autopilot on the
 
 Entries are **newest first**, in the format this repo's own standard mandates.
 
+## 2026-08-03 — the scaffold Helm chart was never scanned, and the run stayed green (`PRJ-35`)
+
+**What changed.** New tier-(a) gate `auto-tests/group-a/scan-scaffold-charts.bash`, an optional
+values overlay at `auto-tests/group-a/scaffold-chart-values/service-helm.yaml`, and one blocking
+job per host: `scaffold-chart-scan` in `.gitlab-ci.yml` (stage `sast`, image `${CHECKOV_IMAGE}`
+= `bridgecrew/checkov:3.3.1`) and `scaffold-charts` in `.github/workflows/ci.yml` (same image,
+via `docker run`). Docs updated: `docs/tests.md` (Feature 2), `docs/contracts.md` (the scaffold
+placeholder vocabulary now has a second reader), `auto-tests/README.md` (why one script is
+`.bash`), `CHANGELOG.md`, `TODO.md`.
+
+The script discovers charts by searching `templates/**/Chart.yaml` (not by naming `service`),
+substitutes a throwaway copy — identity values read from `standard/repo.env`, `@@REGISTRY@@`
+and `@@PULL_SECRET@@` supplied locally because they are deliberately not `repo.env` keys —
+renders with `helm template`, and scans the rendered manifests with
+`checkov -d . --framework kubernetes`, reusing the scaffold's own `.checkov.yaml` skip list
+found by walking up from the chart.
+
+**Why.** `checkov -d .` at the repo root printed
+`[WARNI] Failed processing helm chart @@PROJECT@@ at dir: ./templates/service/helm` and then
+**skipped the chart**, exiting 0. The same run reported `helm scan results: Passed checks: 84`
+— the repo's own `helm/` chart — which reads exactly like coverage of both, so the chart every
+service repo in the group is scaffolded from was never scanned by the gate whose whole purpose
+is scanning charts.
+
+The cause is **not** a broken template, and the guess that it was cost time elsewhere: Helm
+resolves the `@@PROJECT@@.name` / `.fullname` helpers correctly and `.Chart.Name` is the literal
+string `@@PROJECT@@`, so the **rendered** manifest contains `name: @@PROJECT@@` unquoted. `@` is
+a reserved YAML indicator and may not open a plain scalar. `helm template test
+templates/service/helm` reproduces it in one command. `Chart.yaml` already quotes its own
+placeholder for this reason and says so in a comment; the templates do not, and do not need to —
+a scaffold chart is not meant to render before substitution, which is why the fix scans a
+substituted copy rather than quoting the templates.
+
+Rejected alternatives, and why: **quoting every placeholder in the templates** (it would make
+`helm template` succeed but it treats the chart as if it were meant to render un-instantiated,
+and it fixes nothing about the silence); **`skip-path` in the root `.checkov.yaml`** (removes
+the misleading warning and adds no coverage); **putting the script where the shared functional
+runner finds it** (that runner maps exit 77 to "skipped", and a security gate that can report
+"skipped" is the banned shape — hence the `.bash` extension, which the `*.sh` glob does not
+match). `standard/**` was deliberately left untouched: factoring `compose.sh`'s `repo.env`
+reader into a shared helper would remove the last drift seam, but editing `standard/**` is a
+trust-boundary change needing its own approval, and other repositories were being vendored from
+that directory at the same time.
+
+**State.** Branch `feature/PRJ-1-multi-repo-standard`. Everything above is committed and pushed.
+Nothing exists only in a working tree.
+
+**Verified by.** Both directions, on checkov 3.3.1 / helm v4.2.3 locally and again inside
+`bridgecrew/checkov:3.3.1` (helm v3.21.0), with identical results.
+
+- Positive: `OK: 1 scaffold chart(s), 2 scan(s), 11 resource(s) parsed, 168 check(s) passed,
+  0 failed` — 3 resources on the chart's defaults, 6 with the overlay (which is there because
+  `httproute.yaml`, `pdb.yaml` and `servicemonitor.yaml` sit behind `enabled: false` and are
+  otherwise rendered by nothing in this repository).
+- Negative, five deliberate breakages on a throwaway copy, every one exit 1: chart removed
+  (`no chart found under templates/`); an unknown `@@LITERAL@@` token; a template rendering
+  `type: @ClusterIP` (`helm template failed … This is the failure checkov downgrades to a
+  WARNING`); a `Job` with no securityContext and no resources (`14 failed check(s)`); and a
+  chart of unrecognised kinds, where **checkov itself exits 0 with `passed=0 failed=0`** and the
+  gate fails on `checkov parsed ZERO resources`.
+- `shellcheck -s bash` clean; `yamllint` adds no new warning to either CI file (the two it
+  reports on them predate this change).
+- **Not yet verified: the two CI jobs on a real pipeline run.** `PRJ-35` stays open on that.
+
+**Reverse.** `git revert` the commits, or delete `auto-tests/group-a/scan-scaffold-charts.bash`
+plus `auto-tests/group-a/scaffold-chart-values/` and the `scaffold-chart-scan` /
+`scaffold-charts` jobs. Nothing else depends on them; no shared template or other repository
+was touched.
+
+**Open.** The root `checkov -d .` still prints the `WARNI` line and still skips the chart — the
+new gate covers it, but a future reader will re-diagnose the warning. `PRJ-35` also remains open
+until the first CI run is read.
+
 ## 2026-07-27 — three owed follow-ups in the `service` scaffold
 
 **What changed.** Three defects in `templates/service/`, each one inherited by every repo
