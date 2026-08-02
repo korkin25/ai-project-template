@@ -9,6 +9,26 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`Starting a session`** (`PRJ-35`) — the resume point is read **before the first action of
+  every session**, not only "after a break". The older wording was conditional on the agent
+  recognising that it was resuming, and no agent does: every session feels like a fresh start
+  from the inside, so a rule that asks for that judgement never fires. `AUTOPILOT-LOG.md`,
+  `TODO.md` and `questions.md`, in that order, then the plan. The section also states that once
+  oriented the default action is the plan rather than a question to the user — asking what to do
+  next, when the files already say, is how autonomy becomes dictation.
+- **The status feed is journalled locally, because it cannot be read back.** A chronological
+  narration of the work is exactly what a resume wants, and the channel will not give it: the
+  rule is write-only by policy, and on Telegram the Bot API is write-only in fact — there is no
+  method returning a bot's own sent messages, and `getUpdates` carries only *incoming* updates
+  within a short retention window. Measured against a bot that had just posted: `[]`. So a
+  project that wants that history appends to its own journal at send time, which is greppable,
+  survives a lost session, and opens no injection path.
+- **Documentation is committed and pushed as it is written**, not batched to the end of a task.
+  A complete `AUTOPILOT-LOG.md` sitting uncommitted is worth nothing to the next agent, to a
+  parallel agent, or to the same agent after a crash — and worth less than nothing to a reader
+  who finds the branch and concludes nothing happened. A status change is a push; docs are not
+  gated on the feature being green; and where several agents share a repository, a pushed
+  `TODO.md` row is what stops two of them starting the same work.
 - **Hardening has two test surfaces, and only the cheap one gets tested** (`PRJ-33`). A
   container that *starts* under a restriction has not been shown to *work* under it: startup is
   one code path exercised in seconds, operation is every path the workload takes afterwards.

@@ -25,8 +25,8 @@ whose trigger matches below, and keep them loaded. Working from `CLAUDE.md` alon
 
 | Before you… | Open and read |
 |---|---|
-| do **anything** | `TODO.md` (Current state / next action, open work + backlog) and `questions.md` (what is waiting on an answer, and what it blocks) |
-| resume after a break, or pick up someone else's work | `AUTOPILOT-LOG.md` (what was last done, and why) |
+| do **anything** | `AUTOPILOT-LOG.md` (what was last done, and why), `TODO.md` (Current state / next action, open work + backlog) and `questions.md` (what is waiting on an answer, and what it blocks) — see *Starting a session* |
+| resume after a break, or pick up someone else's work | the same three, in the same order |
 | build or change a **feature/bug** | `README.md` `## Features` (the user-facing feature list), `docs/tests.md` (its test plan), `docs/configuration.md` (env vars), the relevant `src/**` |
 | touch **deploy / CI / containers** | `.gitlab-ci.yml`, the Dockerfile, the chart's `README.md` (plus `.github/workflows/ci.yml` only in a repo that also mirrors to GitHub) |
 | change **architecture / data / public API** | `docs/architecture.md` (create it if missing) |
@@ -45,6 +45,71 @@ Three hard rules make this stable, not just advisory:
    it differs from what is committed.
 3. **Per-turn reminder.** A hook re-injects this map every turn for Claude Code, so it
    can't drift out of context. Other agents read it here.
+
+## Starting a session — orient before acting, then work the plan
+
+An agent that begins by doing is an agent that redoes. The first thing a session costs is not
+tokens, it is the work already finished that nobody could see — and the cure is three files and
+about a minute.
+
+**Read these before the first action, every session, not only after a break:**
+
+1. **`AUTOPILOT-LOG.md`** — what was last done, why, what is committed versus only in a working
+   tree, and what was left open. This is the resume point and it is written for a reader with no
+   session context at all.
+2. **`TODO.md`** — its *Current state / next action* block first, then the open rows.
+3. **`questions.md`** — what is blocked on an answer. Starting work that a pending question may
+   invalidate is the most expensive way to be busy.
+
+"Only after a break" was the older wording and it was wrong in a way that took a while to show:
+**no agent believes it is resuming.** Every session feels like a fresh start from the inside, so
+a rule conditioned on self-diagnosis is a rule that never fires. It is unconditional now.
+
+**Then work the plan.** Once oriented, the default action is the next thing the roadmap or
+`TODO.md` says — not waiting to be told, and not whatever the last message happened to mention.
+Where a project keeps an ordered plan, that order is the answer to "what now"; where it does
+not, `TODO.md`'s *Current state / next action* is. Asking the user what to do next, when the
+files already say, is how autonomy quietly becomes dictation.
+
+This does not override *Safe autonomy*: the plan tells you what is next, and the approval rules
+still say what you may do to it alone.
+
+### The status feed cannot be read back — so it is journalled locally
+
+A project publishing a status feed (see *Progress reporting*) will be tempted to treat it as
+part of the resume point: it is chronological, it survives a lost session, and it is where the
+work was narrated. **It is not readable.** The channel is write-only by rule, and on Telegram it
+is also write-only in fact — the Bot API has no method returning a bot's own sent messages, and
+`getUpdates` returns only *incoming* updates within a short retention window. Measured, not
+assumed: `getUpdates` against a bot that had just posted returned `[]`.
+
+So a project that wants that history keeps **its own append-only journal of what it sent**,
+written at send time, in the repository. That is greppable, survives everything, costs one
+append — and, unlike reading the room, opens no injection path into an agent that is otherwise
+well fenced. Where the journal and the feed disagree, the journal is not authoritative either:
+`AUTOPILOT-LOG.md` is, exactly as *Progress reporting* already says.
+
+### Commit and push documentation often — an unpushed record does not exist
+
+Everything above only works if the files are **reachable by someone who is not you**. A perfect
+`AUTOPILOT-LOG.md` sitting uncommitted in a working tree is worth nothing to the next agent, to
+a parallel agent, or to you after a crash — and it is worth less than nothing to a reader who
+finds the branch and concludes that nothing happened.
+
+So documentation is committed and pushed **as it is written**, not batched to the end of a task:
+
+- **A status change is a push.** Starting a row, blocking one, finishing one — that is the
+  moment the record is worth something to somebody else, and the moment it is cheapest to write.
+- **Docs need not wait for the code to be green.** They are not gated on the feature working;
+  a `TODO.md` row saying *this is halfway and here is the seam* is exactly what a reader needs
+  and is a lie only if never written.
+- **Prefer a small docs commit to a large one later.** The batch that never lands is always the
+  one that would have mattered, because work is interrupted more often than it is finished.
+- Where several agents work the same repository in parallel, this is what keeps them from
+  colliding: each one's `TODO.md` row is the claim, and a claim nobody pushed is not a claim.
+
+The failure this prevents is specific and has happened here more than once: a session ends, its
+record is complete and local, and the next session re-derives it — or redoes the work.
 
 ## Changing the rules — the standard is upstream
 
